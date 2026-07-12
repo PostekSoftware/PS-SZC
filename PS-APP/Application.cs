@@ -17,6 +17,8 @@ using SDLGPUCommandBuffer = Hexa.NET.SDL3.SDLGPUCommandBuffer;
 using ImSDLGPUCommandBuffer = Hexa.NET.ImGui.Backends.SDL3.SDLGPUCommandBuffer;
 using SDLGPURenderPass = Hexa.NET.SDL3.SDLGPURenderPass;
 using ImSDLGPURenderPass = Hexa.NET.ImGui.Backends.SDL3.SDLGPURenderPass;
+using ImSDLRenderer = Hexa.NET.ImGui.Backends.SDL3.SDLRenderer;
+using SDLRenderer = Hexa.NET.SDL3.SDLRenderer;
 
 namespace PS.APP;
 
@@ -27,6 +29,7 @@ public class Application
 #pragma warning restore CS8618
 
     private bool _shouldClose;
+    private ApplicationGraphicsBackend _graphicsBackend;
     private unsafe SDLGPUDevice* _gpuDevice;
     private ImageManager? _images;
     private Form? _mainForm;
@@ -106,28 +109,22 @@ public class Application
         Settings?.Load();
 
         if (!SDL.Init((uint)(SDLInitFlags.Video | SDLInitFlags.Gamepad)))
-        {
-            Console.WriteLine($"Error: SDL_Init(): {SDL.GetErrorS()}");
-            return;
-        }
+            throw new InvalidOperationException($"SDL_Init(): {SDL.GetErrorS()}");
 
         _mainScale = SDL.GetDisplayContentScale(SDL.GetPrimaryDisplay());
 
-        _gpuDevice = SDL.CreateGPUDevice(
-            (uint)(SDLGPUShaderFormat.Spirv | SDLGPUShaderFormat.Dxil | SDLGPUShaderFormat.Metallib),
-            true, (byte*)null);
-        if (_gpuDevice == null)
-        {
-            Console.WriteLine($"Error: SDL_CreateGPUDevice(): {SDL.GetErrorS()}");
-            SDL.Quit();
-            return;
-        }
-
-        _images = new ImageManager(_gpuDevice);
+        _gpuDevice = ApplicationGraphicsBackendFactory.TryCreateGpuDevice();
+        _graphicsBackend = _gpuDevice != null
+            ? ApplicationGraphicsBackend.SdlGpu
+            : ApplicationGraphicsBackend.SdlRenderer;
 
         var mainRuntime = CreateWindowRuntime(form, isMain: true, AppWindowOptions.Default);
         _mainRuntime = mainRuntime;
         _windows.Add(mainRuntime);
+
+        _images = _graphicsBackend == ApplicationGraphicsBackend.SdlGpu
+            ? new ImageManager(_gpuDevice)
+            : new ImageManager(mainRuntime.SdlRenderer!);
 
         SDL.ShowWindow(mainRuntime.SdlWindow);
 
@@ -177,7 +174,6 @@ public class Application
                 ActivateRuntime(_mainRuntime);
         }
 
-        SDL.WaitForGPUIdle(_gpuDevice);
         if (Settings?.AutoSaveOnExit == true)
             Settings.Save();
 
@@ -190,7 +186,12 @@ public class Application
         FontFactory.Dispose();
         _images.Dispose();
 
-        SDL.DestroyGPUDevice(_gpuDevice);
+        if (_graphicsBackend == ApplicationGraphicsBackend.SdlGpu)
+        {
+            SDL.WaitForGPUIdle(_gpuDevice);
+            SDL.DestroyGPUDevice(_gpuDevice);
+        }
+
         SDL.Quit();
 
         _mainForm = null;
@@ -313,19 +314,38 @@ public class Application
         FontFactory.Initialize(context, ImGui.GetIO(), scale);
 
         ImGuiImplSDL3.SetCurrentContext(context);
-        ImGuiImplSDL3.InitForSDLGPU((ImSDLWindow*)window);
 
-        ImGuiImplSDLGPU3InitInfo initInfo = new()
+        SDLRenderer* renderer = null;
+        if (_graphicsBackend == ApplicationGraphicsBackend.SdlRenderer)
         {
-            Device = (ImSDLGPUDevice*)_gpuDevice,
-            ColorTargetFormat = (int)SDL.GetGPUSwapchainTextureFormat(_gpuDevice, window),
-            MSAASamples = (int)SDLGPUSampleCount.Samplecount1
-        };
-        ImGuiImplSDL3.SDLGPU3Init(&initInfo);
+            renderer = ApplicationGraphicsBackendFactory.CreateSdlRenderer(window);
+            ImGuiImplSDL3.InitForSDLRenderer((ImSDLWindow*)window, (ImSDLRenderer*)renderer);
+            ImGuiImplSDL3.SDLRenderer3Init((ImSDLRenderer*)renderer);
+        }
+        else
+        {
+            if (!SDL.ClaimWindowForGPUDevice(_gpuDevice, window))
+            {
+                SDL.DestroyWindow(window);
+                throw new InvalidOperationException($"SDL_ClaimWindowForGPUDevice(): {SDL.GetErrorS()}");
+            }
+
+            ConfigureSwapchain(_gpuDevice, window);
+            ImGuiImplSDL3.InitForSDLGPU((ImSDLWindow*)window);
+
+            ImGuiImplSDLGPU3InitInfo initInfo = new()
+            {
+                Device = (ImSDLGPUDevice*)_gpuDevice,
+                ColorTargetFormat = (int)SDL.GetGPUSwapchainTextureFormat(_gpuDevice, window),
+                MSAASamples = (int)SDLGPUSampleCount.Samplecount1
+            };
+            ImGuiImplSDL3.SDLGPU3Init(&initInfo);
+        }
 
         var runtime = new WindowRuntime
         {
             SdlWindow = window,
+            SdlRenderer = renderer,
             ImGuiContext = context,
             Form = form,
             Scale = scale,
@@ -360,13 +380,6 @@ public class Application
         else if (centered)
             SDL.SetWindowPosition(window, (int)SDL.SDL_WINDOWPOS_CENTERED_MASK, (int)SDL.SDL_WINDOWPOS_CENTERED_MASK);
 
-        if (!SDL.ClaimWindowForGPUDevice(_gpuDevice, window))
-        {
-            SDL.DestroyWindow(window);
-            throw new InvalidOperationException($"SDL_ClaimWindowForGPUDevice(): {SDL.GetErrorS()}");
-        }
-
-        ConfigureSwapchain(_gpuDevice, window);
         return window;
     }
 
@@ -424,7 +437,11 @@ public class Application
     {
         ActivateRuntime(runtime);
 
-        ImGuiImplSDL3.SDLGPU3NewFrame();
+        if (_graphicsBackend == ApplicationGraphicsBackend.SdlGpu)
+            ImGuiImplSDL3.SDLGPU3NewFrame();
+        else
+            ImGuiImplSDL3.SDLRenderer3NewFrame();
+
         ImGuiImplSDL3.NewFrame();
         ImGui.NewFrame();
 
@@ -438,6 +455,13 @@ public class Application
 
         ImGui.Render();
         ImDrawData* drawData = ImGui.GetDrawData();
+
+        if (_graphicsBackend == ApplicationGraphicsBackend.SdlRenderer)
+        {
+            RenderWithSdlRenderer(runtime, drawData);
+            return;
+        }
+
         bool isDrawMinimized = drawData->DisplaySize.X <= 0 || drawData->DisplaySize.Y <= 0;
 
         SDLGPUCommandBuffer* commandBuffer = SDL.AcquireGPUCommandBuffer(_gpuDevice);
@@ -612,11 +636,21 @@ public class Application
         ActivateRuntime(runtime);
 
         ImGuiImplSDL3.Shutdown();
-        ImGuiImplSDL3.SDLGPU3Shutdown();
+        if (_graphicsBackend == ApplicationGraphicsBackend.SdlGpu)
+        {
+            ImGuiImplSDL3.SDLGPU3Shutdown();
+            SDL.ReleaseWindowFromGPUDevice(_gpuDevice, runtime.SdlWindow);
+        }
+        else
+        {
+            ImGuiImplSDL3.SDLRenderer3Shutdown();
+            if (runtime.SdlRenderer != null)
+                SDL.DestroyRenderer(runtime.SdlRenderer);
+        }
+
         FontFactory.ReleaseContext(runtime.ImGuiContext);
         ImGui.DestroyContext(runtime.ImGuiContext);
 
-        SDL.ReleaseWindowFromGPUDevice(_gpuDevice, runtime.SdlWindow);
         SDL.DestroyWindow(runtime.SdlWindow);
 
         runtime.Form.Window = null;
@@ -638,5 +672,24 @@ public class Application
 
         if (!SDL.SetGPUSwapchainParameters(gpuDevice, window, composition, presentMode))
             SDL.SetGPUSwapchainParameters(gpuDevice, window, composition, SDLGPUPresentMode.Vsync);
+    }
+
+    private unsafe void RenderWithSdlRenderer(WindowRuntime runtime, ImDrawData* drawData)
+    {
+        if (runtime.SdlRenderer == null)
+            return;
+
+        if (drawData->DisplaySize.X <= 0 || drawData->DisplaySize.Y <= 0)
+            return;
+
+        SDL.SetRenderDrawColor(
+            runtime.SdlRenderer,
+            (byte)(ClearColor.X * 255),
+            (byte)(ClearColor.Y * 255),
+            (byte)(ClearColor.Z * 255),
+            (byte)(ClearColor.W * 255));
+        SDL.RenderClear(runtime.SdlRenderer);
+        ImGuiImplSDL3.SDLRenderer3RenderDrawData(drawData, (ImSDLRenderer*)runtime.SdlRenderer);
+        SDL.RenderPresent(runtime.SdlRenderer);
     }
 }

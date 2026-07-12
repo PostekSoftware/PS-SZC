@@ -15,6 +15,8 @@ internal sealed unsafe class WindowRuntime
 
     public required float Scale { get; init; }
 
+    public SDLRenderer* SdlRenderer { get; init; }
+
     public bool IsMain { get; init; }
 
     public Form? ActiveForm { get; set; }

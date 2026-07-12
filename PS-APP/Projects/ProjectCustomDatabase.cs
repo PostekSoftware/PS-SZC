@@ -5,15 +5,17 @@ namespace PS.APP.Projects;
 public sealed class ProjectCustomDatabase : IDisposable
 {
     private readonly ProjectFile? _project;
+    private readonly string _databasePath;
+    private SqliteConnection? _connection;
     private bool _disposed;
 
     private ProjectCustomDatabase(
+        string databasePath,
         ProjectCustomDatabaseEntry entry,
-        SqliteConnection connection,
         ProjectFile? project)
     {
+        _databasePath = databasePath;
         Entry = entry;
-        Connection = connection;
         _project = project;
     }
 
@@ -23,7 +25,7 @@ public sealed class ProjectCustomDatabase : IDisposable
 
     internal ProjectCustomDatabaseEntry Entry { get; private set; }
 
-    public SqliteConnection Connection { get; }
+    public SqliteConnection Connection => _connection ??= SqliteConnectionHelper.OpenConnection(_databasePath);
 
     internal static ProjectCustomDatabase Create(
         string absolutePath,
@@ -35,10 +37,7 @@ public sealed class ProjectCustomDatabase : IDisposable
         if (!string.IsNullOrEmpty(directory))
             Directory.CreateDirectory(directory);
 
-        var connection = new SqliteConnection($"Data Source={absolutePath}");
-        connection.Open();
-
-        var database = new ProjectCustomDatabase(entry, connection, project);
+        var database = new ProjectCustomDatabase(absolutePath, entry, project);
         configure?.Invoke(database);
         return database;
     }
@@ -51,9 +50,7 @@ public sealed class ProjectCustomDatabase : IDisposable
         if (!File.Exists(absolutePath))
             throw new FileNotFoundException($"Custom database file not found: {absolutePath}");
 
-        var connection = new SqliteConnection($"Data Source={absolutePath}");
-        connection.Open();
-        return new ProjectCustomDatabase(entry, connection, project);
+        return new ProjectCustomDatabase(absolutePath, entry, project);
     }
 
     public int ExecuteNonQuery(string sql, params SqliteParameter[] parameters)
@@ -90,8 +87,20 @@ public sealed class ProjectCustomDatabase : IDisposable
         if (_disposed)
             return;
 
-        Connection.Dispose();
+        ReleaseConnectionForPackaging();
         _disposed = true;
+    }
+
+    internal void ReleaseConnectionForPackaging()
+    {
+        ThrowIfDisposed();
+        SqliteConnectionHelper.ReleaseConnection(ref _connection);
+    }
+
+    internal void ReopenAfterPackaging()
+    {
+        ThrowIfDisposed();
+        _ = Connection;
     }
 
     internal void TouchModified(DateTimeOffset? modifiedAt = null)

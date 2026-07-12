@@ -10,7 +10,7 @@ public static class ProjectEfCore
         ArgumentException.ThrowIfNullOrWhiteSpace(databaseFilePath);
 
         return new DbContextOptionsBuilder<TContext>()
-            .UseSqlite($"Data Source={databaseFilePath}")
+            .UseSqlite(SqliteConnectionHelper.BuildConnectionString(databaseFilePath))
             .Options;
     }
 }

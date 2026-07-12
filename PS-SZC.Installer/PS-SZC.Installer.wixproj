@@ -1,5 +1,11 @@
 <Project Sdk="WixToolset.Sdk/5.0.2">
 
+  <PropertyGroup Condition="!$([MSBuild]::IsOSPlatform('Windows'))">
+    <IsBuildable>false</IsBuildable>
+    <BuildDependsOn></BuildDependsOn>
+    <RebuildDependsOn></RebuildDependsOn>
+  </PropertyGroup>
+
   <PropertyGroup>
     <OutputType>Package</OutputType>
     <OutputName>PS-SZC</OutputName>
@@ -16,7 +22,7 @@
   <Target Name="PublishApp" BeforeTargets="BeforeBuild" Condition="'$(SkipPublishApp)' != 'true'">
     <MakeDir Directories="$(AppPublishDir)" />
     <Exec Command="dotnet restore &quot;$(AppProjectFullPath)&quot; -r win-x64" />
-    <Exec Command="dotnet publish &quot;$(AppProjectFullPath)&quot; -c $(Configuration) -r win-x64 --no-self-contained /p:SkipCreateWindowsInstaller=true /p:PublishSingleFile=false /p:PublishDir=&quot;$(AppPublishDir)&quot;" />
+    <Exec Command="dotnet publish &quot;$(AppProjectFullPath)&quot; -c $(Configuration) -r win-x64 --no-self-contained /p:PublishSingleFile=false /p:PublishDir=&quot;$(AppPublishDir)&quot;" />
     <Error Condition="!Exists('$(AppPublishDir)')"
            Text="Published app output not found at '$(AppPublishDir)'." />
   </Target>

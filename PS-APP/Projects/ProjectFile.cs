@@ -406,10 +406,37 @@ public sealed class ProjectFile : IDisposable
 
             TouchModified();
             WriteManifest();
-            ProjectPackageIO.CreatePackage(WorkspacePath, filePath);
+
+            CloseDatabaseConnectionsForPackaging();
+            try
+            {
+                SqliteConnectionHelper.ClearAllPools();
+                ProjectPackageIO.CreatePackage(WorkspacePath, filePath);
+            }
+            finally
+            {
+                ReopenDatabaseConnectionsAfterPackaging();
+            }
+
             FilePath = Path.GetFullPath(filePath);
             _savedToDiskModifiedAt = ModifiedAt;
         }
+    }
+
+    internal void CloseDatabaseConnectionsForPackaging()
+    {
+        Database.ReleaseConnectionForPackaging();
+
+        foreach (var customDatabase in _openCustomDatabases.Values)
+            customDatabase.ReleaseConnectionForPackaging();
+    }
+
+    internal void ReopenDatabaseConnectionsAfterPackaging()
+    {
+        Database.ReopenAfterPackaging();
+
+        foreach (var customDatabase in _openCustomDatabases.Values)
+            customDatabase.ReopenAfterPackaging();
     }
 
     public void Dispose()

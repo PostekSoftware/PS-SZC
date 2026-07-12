@@ -1,3 +1,5 @@
+using Microsoft.Data.Sqlite;
+
 namespace PS.APP.Projects;
 
 public sealed record ProjectDocumentEntry(
@@ -9,9 +11,12 @@ public sealed record ProjectDocumentEntry(
 
 internal sealed class ProjectDatabase : IDisposable
 {
-    private readonly Microsoft.Data.Sqlite.SqliteConnection _connection;
+    private readonly string _databasePath;
+    private SqliteConnection? _connection;
 
-    private ProjectDatabase(Microsoft.Data.Sqlite.SqliteConnection connection) => _connection = connection;
+    private ProjectDatabase(string databasePath) => _databasePath = databasePath;
+
+    private SqliteConnection Connection => _connection ??= SqliteConnectionHelper.OpenConnection(_databasePath);
 
     public static ProjectDatabase Open(string databasePath)
     {
@@ -19,16 +24,14 @@ internal sealed class ProjectDatabase : IDisposable
         if (!string.IsNullOrEmpty(directory))
             Directory.CreateDirectory(directory);
 
-        var connection = new Microsoft.Data.Sqlite.SqliteConnection($"Data Source={databasePath}");
-        connection.Open();
-        var database = new ProjectDatabase(connection);
+        var database = new ProjectDatabase(databasePath);
         database.InitializeSchema();
         return database;
     }
 
     public void SetMetadata(string key, string value)
     {
-        using var command = _connection.CreateCommand();
+        using var command = Connection.CreateCommand();
         command.CommandText =
             """
             INSERT INTO metadata (key, value) VALUES ($key, $value)
@@ -41,7 +44,7 @@ internal sealed class ProjectDatabase : IDisposable
 
     public string? GetMetadata(string key)
     {
-        using var command = _connection.CreateCommand();
+        using var command = Connection.CreateCommand();
         command.CommandText = "SELECT value FROM metadata WHERE key = $key;";
         command.Parameters.AddWithValue("$key", key);
         return command.ExecuteScalar() as string;
@@ -49,7 +52,7 @@ internal sealed class ProjectDatabase : IDisposable
 
     public void InsertDocument(ProjectDocumentEntry entry)
     {
-        using var command = _connection.CreateCommand();
+        using var command = Connection.CreateCommand();
         command.CommandText =
             """
             INSERT INTO documents (id, name, relative_path, created_at, modified_at)
@@ -61,7 +64,7 @@ internal sealed class ProjectDatabase : IDisposable
 
     public void UpdateDocument(ProjectDocumentEntry entry)
     {
-        using var command = _connection.CreateCommand();
+        using var command = Connection.CreateCommand();
         command.CommandText =
             """
             UPDATE documents
@@ -74,7 +77,7 @@ internal sealed class ProjectDatabase : IDisposable
 
     public void DeleteDocument(string id)
     {
-        using var command = _connection.CreateCommand();
+        using var command = Connection.CreateCommand();
         command.CommandText = "DELETE FROM documents WHERE id = $id;";
         command.Parameters.AddWithValue("$id", id);
         command.ExecuteNonQuery();
@@ -82,7 +85,7 @@ internal sealed class ProjectDatabase : IDisposable
 
     public ProjectDocumentEntry? GetDocument(string id)
     {
-        using var command = _connection.CreateCommand();
+        using var command = Connection.CreateCommand();
         command.CommandText =
             """
             SELECT id, name, relative_path, created_at, modified_at
@@ -97,7 +100,7 @@ internal sealed class ProjectDatabase : IDisposable
     public IReadOnlyList<ProjectDocumentEntry> GetDocuments()
     {
         var documents = new List<ProjectDocumentEntry>();
-        using var command = _connection.CreateCommand();
+        using var command = Connection.CreateCommand();
         command.CommandText =
             """
             SELECT id, name, relative_path, created_at, modified_at
@@ -112,7 +115,7 @@ internal sealed class ProjectDatabase : IDisposable
 
     public void InsertCustomDatabase(ProjectCustomDatabaseEntry entry)
     {
-        using var command = _connection.CreateCommand();
+        using var command = Connection.CreateCommand();
         command.CommandText =
             """
             INSERT INTO custom_databases (id, name, relative_path, created_at, modified_at)
@@ -124,7 +127,7 @@ internal sealed class ProjectDatabase : IDisposable
 
     public void UpdateCustomDatabase(ProjectCustomDatabaseEntry entry)
     {
-        using var command = _connection.CreateCommand();
+        using var command = Connection.CreateCommand();
         command.CommandText =
             """
             UPDATE custom_databases
@@ -137,7 +140,7 @@ internal sealed class ProjectDatabase : IDisposable
 
     public void DeleteCustomDatabase(string id)
     {
-        using var command = _connection.CreateCommand();
+        using var command = Connection.CreateCommand();
         command.CommandText = "DELETE FROM custom_databases WHERE id = $id;";
         command.Parameters.AddWithValue("$id", id);
         command.ExecuteNonQuery();
@@ -145,7 +148,7 @@ internal sealed class ProjectDatabase : IDisposable
 
     public ProjectCustomDatabaseEntry? GetCustomDatabase(string id)
     {
-        using var command = _connection.CreateCommand();
+        using var command = Connection.CreateCommand();
         command.CommandText =
             """
             SELECT id, name, relative_path, created_at, modified_at
@@ -159,7 +162,7 @@ internal sealed class ProjectDatabase : IDisposable
 
     public ProjectCustomDatabaseEntry? GetCustomDatabaseByName(string name)
     {
-        using var command = _connection.CreateCommand();
+        using var command = Connection.CreateCommand();
         command.CommandText =
             """
             SELECT id, name, relative_path, created_at, modified_at
@@ -174,7 +177,7 @@ internal sealed class ProjectDatabase : IDisposable
     public IReadOnlyList<ProjectCustomDatabaseEntry> GetCustomDatabases()
     {
         var databases = new List<ProjectCustomDatabaseEntry>();
-        using var command = _connection.CreateCommand();
+        using var command = Connection.CreateCommand();
         command.CommandText =
             """
             SELECT id, name, relative_path, created_at, modified_at
@@ -187,11 +190,16 @@ internal sealed class ProjectDatabase : IDisposable
         return databases;
     }
 
-    public void Dispose() => _connection.Dispose();
+    public void Dispose() => ReleaseConnectionForPackaging();
+
+    internal void ReleaseConnectionForPackaging() =>
+        SqliteConnectionHelper.ReleaseConnection(ref _connection);
+
+    internal void ReopenAfterPackaging() => _ = Connection;
 
     private void InitializeSchema()
     {
-        using var command = _connection.CreateCommand();
+        using var command = Connection.CreateCommand();
         command.CommandText =
             """
             CREATE TABLE IF NOT EXISTS metadata (
@@ -218,7 +226,7 @@ internal sealed class ProjectDatabase : IDisposable
         command.ExecuteNonQuery();
     }
 
-    private static void AddDocumentParameters(Microsoft.Data.Sqlite.SqliteCommand command, ProjectDocumentEntry entry)
+    private static void AddDocumentParameters(SqliteCommand command, ProjectDocumentEntry entry)
     {
         command.Parameters.AddWithValue("$id", entry.Id);
         command.Parameters.AddWithValue("$name", entry.Name);
@@ -227,7 +235,7 @@ internal sealed class ProjectDatabase : IDisposable
         command.Parameters.AddWithValue("$modifiedAt", entry.ModifiedAt.ToString("O"));
     }
 
-    private static ProjectDocumentEntry ReadDocument(Microsoft.Data.Sqlite.SqliteDataReader reader) =>
+    private static ProjectDocumentEntry ReadDocument(SqliteDataReader reader) =>
         new(
             reader.GetString(0),
             reader.GetString(1),
@@ -236,7 +244,7 @@ internal sealed class ProjectDatabase : IDisposable
             DateTimeOffset.Parse(reader.GetString(4)));
 
     private static void AddCustomDatabaseParameters(
-        Microsoft.Data.Sqlite.SqliteCommand command,
+        SqliteCommand command,
         ProjectCustomDatabaseEntry entry)
     {
         command.Parameters.AddWithValue("$id", entry.Id);
@@ -246,7 +254,7 @@ internal sealed class ProjectDatabase : IDisposable
         command.Parameters.AddWithValue("$modifiedAt", entry.ModifiedAt.ToString("O"));
     }
 
-    private static ProjectCustomDatabaseEntry ReadCustomDatabase(Microsoft.Data.Sqlite.SqliteDataReader reader) =>
+    private static ProjectCustomDatabaseEntry ReadCustomDatabase(SqliteDataReader reader) =>
         new(
             reader.GetString(0),
             reader.GetString(1),

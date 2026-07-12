@@ -2,7 +2,7 @@
 <Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
   <Package Name="PS-SZC"
            Manufacturer="PostekSoftware"
-           Version="1.0.0.0"
+           Version="1.1.0.0"
            UpgradeCode="E4B8C2A1-7F3D-4E6B-9C0A-1B2C3D4E5F6A"
            Scope="perMachine">
 
@@ -13,8 +13,16 @@
       <ComponentGroupRef Id="AppFiles" />
       <ComponentRef Id="PsszcFileAssociation" />
       <ComponentRef Id="PsszcDefaultApplicationRegistration" />
+      <ComponentRef Id="PsszcShortcuts" />
     </Feature>
   </Package>
+
+  <Fragment>
+    <StandardDirectory Id="ProgramMenuFolder">
+      <Directory Id="ApplicationProgramsFolder" Name="PS-SZC" />
+    </StandardDirectory>
+    <StandardDirectory Id="DesktopFolder" />
+  </Fragment>
 
   <Fragment>
     <StandardDirectory Id="ProgramFiles6432Folder">
@@ -54,6 +62,33 @@
       <RegistryKey Root="HKLM" Key="Software\RegisteredApplications">
         <RegistryValue Type="string" Name="Software\PostekSoftware\PS-SZC\Capabilities" Value="PS-SZC" />
       </RegistryKey>
+    </Component>
+
+    <Component Id="PsszcShortcuts"
+               Directory="INSTALLFOLDER"
+               Bitness="always64"
+               Guid="2B3C4D5E-6F70-8192-A3B4-C5D6E7F80910">
+      <Shortcut Id="PsszcStartMenuShortcut"
+                Name="PS-SZC"
+                Description="PS-SZC School Payments"
+                Directory="ApplicationProgramsFolder"
+                Target="[INSTALLFOLDER]PS-SZC.exe"
+                WorkingDirectory="INSTALLFOLDER" />
+      <Shortcut Id="PsszcDesktopShortcut"
+                Name="PS-SZC"
+                Description="PS-SZC School Payments"
+                Directory="DesktopFolder"
+                Target="[INSTALLFOLDER]PS-SZC.exe"
+                WorkingDirectory="INSTALLFOLDER" />
+      <RemoveFolder Id="RemoveApplicationProgramsFolder"
+                    Directory="ApplicationProgramsFolder"
+                    On="uninstall" />
+      <RegistryValue Root="HKCU"
+                     Key="Software\PostekSoftware\PS-SZC"
+                     Name="ShortcutsInstalled"
+                     Type="integer"
+                     Value="1"
+                     KeyPath="yes" />
     </Component>
   </Fragment>
 </Wix>

@@ -102,17 +102,24 @@ public sealed class SettingsManager
             return;
         }
 
-        var json = File.ReadAllText(_filePath);
-        var root = JsonNode.Parse(json) as JsonObject;
-        if (root == null)
-            return;
-
-        foreach (var (key, node) in root)
+        try
         {
-            if (!_settings.TryGetValue(key, out var setting) || node == null)
-                continue;
+            var json = File.ReadAllText(_filePath);
+            var root = JsonNode.Parse(json) as JsonObject;
+            if (root == null)
+                return;
 
-            setting.SetValue(ReadNode(node, setting.GetValue()?.GetType() ?? typeof(object)));
+            foreach (var (key, node) in root)
+            {
+                if (!_settings.TryGetValue(key, out var setting) || node == null)
+                    continue;
+
+                setting.SetValue(ReadNode(node, setting.GetValue()?.GetType() ?? typeof(object)));
+            }
+        }
+        catch (JsonException)
+        {
+            // Ignore invalid settings files and keep defaults.
         }
 
         IsDirty = false;

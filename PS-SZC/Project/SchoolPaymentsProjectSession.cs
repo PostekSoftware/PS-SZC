@@ -173,7 +173,7 @@ internal sealed class SchoolPaymentsProjectSession : IDisposable
                 return;
             }
 
-            _project.Save();
+            ExecuteWithClosedContextConnection(() => _project.Save());
             setStatus(LocalizedString.FromId("Project.Saved", () => _project.FilePath!));
         }
         catch (Exception ex)
@@ -191,7 +191,7 @@ internal sealed class SchoolPaymentsProjectSession : IDisposable
         {
             _context?.SaveChanges();
             var normalizedPath = EnsureProjectExtension(filePath);
-            _project.SaveAs(normalizedPath);
+            ExecuteWithClosedContextConnection(() => _project.SaveAs(normalizedPath));
             setStatus(LocalizedString.FromId("Project.Saved", () => normalizedPath));
         }
         catch (Exception ex)
@@ -245,13 +245,29 @@ internal sealed class SchoolPaymentsProjectSession : IDisposable
                 return;
             }
 
-            _project.Save();
+            ExecuteWithClosedContextConnection(() => _project.Save());
             setStatus(LocalizedString.FromId("Project.Saved", () => _project.FilePath!));
             onSaved();
         }
         catch (Exception ex)
         {
             setStatus(LocalizedString.FromId("Project.Error", () => ex.Message));
+        }
+    }
+
+    private void ExecuteWithClosedContextConnection(Action action)
+    {
+        _context?.SaveChanges();
+        _context?.Dispose();
+        _context = null;
+
+        try
+        {
+            action();
+        }
+        finally
+        {
+            EnsureDatabase();
         }
     }
 

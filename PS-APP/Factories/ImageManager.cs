@@ -4,6 +4,7 @@ using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
 using System.Numerics;
 using SDLGPUDevice = Hexa.NET.SDL3.SDLGPUDevice;
+using SDLRenderer = Hexa.NET.SDL3.SDLRenderer;
 
 namespace PS.APP;
 
@@ -42,11 +43,23 @@ public sealed class ImageResource : IDisposable
 public sealed unsafe class ImageManager
 {
     private readonly SDLGPUDevice* _gpuDevice;
+    private readonly SDLRenderer* _renderer;
+    private readonly bool _usesGpuDevice;
     private readonly Dictionary<Image<Rgba32>, ImageResource> _resources = [];
     private readonly Dictionary<nint, Image<Rgba32>> _textureLookup = [];
     private readonly HashSet<nint> _usedThisFrame = [];
 
-    internal ImageManager(SDLGPUDevice* gpuDevice) => _gpuDevice = gpuDevice;
+    internal ImageManager(SDLGPUDevice* gpuDevice)
+    {
+        _gpuDevice = gpuDevice;
+        _usesGpuDevice = true;
+    }
+
+    internal ImageManager(SDLRenderer* renderer)
+    {
+        _renderer = renderer;
+        _usesGpuDevice = false;
+    }
 
     public ImageResource LoadFromFile(string path)
     {
@@ -62,7 +75,9 @@ public sealed unsafe class ImageManager
             return existing;
         }
 
-        var textureId = CreateGpuTexture(image);
+        var textureId = _usesGpuDevice
+            ? CreateGpuTexture(image)
+            : CreateRendererTexture(image);
         var resource = new ImageResource(image, textureId, image.Width, image.Height);
         _resources[image] = resource;
         _textureLookup[textureId] = image;
@@ -103,11 +118,11 @@ public sealed unsafe class ImageManager
             Usage = (uint)SDLGPUTextureUsageFlags.Sampler
         });
 
-        UploadTexture(gpuTexture, image);
+        UploadGpuTexture(gpuTexture, image);
         return (nint)gpuTexture;
     }
 
-    private unsafe void UploadTexture(SDLGPUTexture* gpuTexture, Image<Rgba32> image)
+    private unsafe void UploadGpuTexture(SDLGPUTexture* gpuTexture, Image<Rgba32> image)
     {
         int size = image.Width * image.Height * 4;
 
@@ -155,11 +170,54 @@ public sealed unsafe class ImageManager
         SDL.ReleaseGPUTransferBuffer(_gpuDevice, transferBuffer);
     }
 
+    private nint CreateRendererTexture(Image<Rgba32> image)
+    {
+        SDLTexture* texture = SDL.CreateTexture(
+            _renderer,
+            SDLPixelFormat.Rgba32,
+            SDLTextureAccess.Static,
+            image.Width,
+            image.Height);
+
+        if (texture == null)
+            throw new InvalidOperationException($"SDL_CreateTexture(): {SDL.GetErrorS()}");
+
+        var pixels = new byte[image.Width * image.Height * 4];
+        image.ProcessPixelRows(accessor =>
+        {
+            for (var y = 0; y < accessor.Height; y++)
+            {
+                var source = accessor.GetRowSpan(y);
+                var offset = y * image.Width * 4;
+                for (var x = 0; x < source.Length; x++)
+                {
+                    var pixel = source[x];
+                    var index = offset + x * 4;
+                    pixels[index] = pixel.R;
+                    pixels[index + 1] = pixel.G;
+                    pixels[index + 2] = pixel.B;
+                    pixels[index + 3] = pixel.A;
+                }
+            }
+        });
+
+        fixed (byte* pixelPtr = pixels)
+        {
+            if (!SDL.UpdateTexture(texture, null, pixelPtr, image.Width * 4))
+                throw new InvalidOperationException($"SDL_UpdateTexture(): {SDL.GetErrorS()}");
+        }
+
+        return (nint)texture;
+    }
+
     private unsafe void ReleaseTexture(nint textureId)
     {
         if (textureId == 0)
             return;
 
-        SDL.ReleaseGPUTexture(_gpuDevice, (SDLGPUTexture*)textureId);
+        if (_usesGpuDevice)
+            SDL.ReleaseGPUTexture(_gpuDevice, (SDLGPUTexture*)textureId);
+        else
+            SDL.DestroyTexture((SDLTexture*)textureId);
     }
 }

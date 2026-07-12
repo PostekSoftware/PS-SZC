@@ -21,7 +21,7 @@ public sealed class FileLocalizer : ILocalizer
     {
         _legacyLocaleFilePath = writeFilePath;
         _sourceFilePaths = sourceFilePaths.ToArray();
-        _preferencesFilePath = Path.Combine(AppContext.BaseDirectory, "user-settings.json");
+        _preferencesFilePath = AppPaths.UserDataFile("user-settings.json");
         _undefinedValue = undefinedValue;
         Load();
     }
