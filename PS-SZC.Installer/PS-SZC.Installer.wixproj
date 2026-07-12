@@ -17,8 +17,4 @@
     </ProjectReference>
   </ItemGroup>
 
-  <ItemGroup>
-    <PackageReference Include="WixToolset.DotNet.wixext" Version="5.0.2" />
-  </ItemGroup>
-
 </Project>

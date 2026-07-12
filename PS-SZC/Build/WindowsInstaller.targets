@@ -9,26 +9,37 @@
   <Target Name="CreateWindowsInstaller"
           AfterTargets="Build"
           Condition="$([MSBuild]::IsOSPlatform('Windows'))">
-    <MSBuild Projects="$(WindowsInstallerProject)"
-             Targets="Build"
-             Properties="Configuration=$(Configuration);InstallerPlatform=x64" />
-    <Error Condition="!Exists('$(WindowsInstallerOutput)')"
-           Text="Windows installer was not created: $(WindowsInstallerOutput)" />
-    <Copy SourceFiles="$(WindowsInstallerOutput)"
-          DestinationFiles="$(TargetDir)$(WindowsInstallerName)"
-          SkipUnchangedFiles="true" />
+    <MSBuild Projects="$(MSBuildProjectFile)"
+             Targets="_BuildWindowsInstaller"
+             Properties="WindowsInstallerCopyDir=$(TargetDir)" />
   </Target>
 
   <Target Name="CreateWindowsInstallerPublish"
           AfterTargets="Publish"
           Condition="$([MSBuild]::IsOSPlatform('Windows'))">
+    <MSBuild Projects="$(MSBuildProjectFile)"
+             Targets="_BuildWindowsInstaller"
+             Properties="WindowsInstallerCopyDir=$(PublishDir)" />
+  </Target>
+
+  <Target Name="_BuildWindowsInstaller"
+          Condition="$([MSBuild]::IsOSPlatform('Windows'))">
+    <Error Condition="'$(WindowsInstallerCopyDir)' == ''"
+           Text="WindowsInstallerCopyDir is not set." />
+
+    <MSBuild Projects="$(WindowsInstallerProject)"
+             Targets="Restore"
+             Properties="Configuration=$(Configuration);InstallerPlatform=x64" />
+
     <MSBuild Projects="$(WindowsInstallerProject)"
              Targets="Build"
-             Properties="Configuration=$(Configuration);InstallerPlatform=x64" />
+             Properties="Configuration=$(Configuration);InstallerPlatform=x64;Restore=false" />
+
     <Error Condition="!Exists('$(WindowsInstallerOutput)')"
            Text="Windows installer was not created: $(WindowsInstallerOutput)" />
+
     <Copy SourceFiles="$(WindowsInstallerOutput)"
-          DestinationFiles="$(PublishDir)$(WindowsInstallerName)"
+          DestinationFiles="$(WindowsInstallerCopyDir)$(WindowsInstallerName)"
           SkipUnchangedFiles="true" />
   </Target>
 </Project>
