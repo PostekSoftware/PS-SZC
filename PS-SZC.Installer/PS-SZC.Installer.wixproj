@@ -13,7 +13,7 @@
   <ItemGroup>
     <ProjectReference Include="..\PS-SZC\PS-SZC.csproj">
       <Publish>true</Publish>
-      <Properties>RuntimeIdentifier=win-x64;SelfContained=false;PublishSingleFile=false</Properties>
+      <Properties>RuntimeIdentifier=win-x64;SelfContained=false;PublishSingleFile=false;SkipCreateWindowsInstaller=true</Properties>
     </ProjectReference>
   </ItemGroup>
 
