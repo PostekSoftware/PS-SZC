@@ -34,6 +34,8 @@ internal sealed class SchoolPaymentsForm : Form
     }
 
     private readonly SchoolPaymentsProjectSession _session = new();
+    private readonly string? _startupProjectPath;
+    private bool _startupProjectOpened;
     private AppTab _activeTab = AppTab.Families;
     private AppTab? _pendingTab;
     private FamilyEditorTab _familyEditorTab = FamilyEditorTab.Overview;
@@ -113,11 +115,22 @@ internal sealed class SchoolPaymentsForm : Form
     private string ExitUnsavedPopupName =>
         $"{LocalizedString.FromId("Exit.Unsaved.Title")}{ExitUnsavedPopupId}";
 
-    public SchoolPaymentsForm()
+    public SchoolPaymentsForm(string? startupProjectPath = null)
     {
+        _startupProjectPath = startupProjectPath;
         Title = LocalizedString.FromId("App.Title");
         Size = new Vector2(1440, 900);
         Padding = new Vector2(16, 16);
+        Load += OnFormLoad;
+    }
+
+    private void OnFormLoad(object? sender, EventArgs e)
+    {
+        if (_startupProjectOpened || string.IsNullOrWhiteSpace(_startupProjectPath))
+            return;
+
+        _startupProjectOpened = true;
+        _session.OpenProject(_startupProjectPath, SetStatus);
     }
 
     public override void Draw()

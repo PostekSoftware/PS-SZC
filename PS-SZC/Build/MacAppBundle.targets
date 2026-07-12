@@ -1,0 +1,75 @@
+<Project>
+  <PropertyGroup Condition="$([MSBuild]::IsOSPlatform('OSX'))">
+    <AppBundleName>PS-SZC.app</AppBundleName>
+    <DmgName>PS-SZC.dmg</DmgName>
+    <DmgVolumeName>PS-SZC</DmgVolumeName>
+    <MacAppIconSource>$(MSBuildProjectDirectory)/Content/icon.png</MacAppIconSource>
+    <MacAppIconScript>$(MSBuildProjectDirectory)/Build/create-macos-app-icon.sh</MacAppIconScript>
+    <MacDmgScript>$(MSBuildProjectDirectory)/Build/create-macos-dmg.sh</MacDmgScript>
+  </PropertyGroup>
+
+  <Target Name="CreateMacAppBundle"
+          AfterTargets="Build"
+          Condition="$([MSBuild]::IsOSPlatform('OSX'))">
+    <MSBuild Projects="$(MSBuildProjectFile)"
+             Targets="_CreateMacAppBundle;_CreateMacDmg"
+             Properties="AppBundleOutputRoot=$(TargetDir)" />
+  </Target>
+
+  <Target Name="CreateMacAppBundlePublish"
+          AfterTargets="Publish"
+          Condition="$([MSBuild]::IsOSPlatform('OSX'))">
+    <MSBuild Projects="$(MSBuildProjectFile)"
+             Targets="_CreateMacAppBundle;_CreateMacDmg"
+             Properties="AppBundleOutputRoot=$(PublishDir)" />
+  </Target>
+
+  <Target Name="_CreateMacAppBundle">
+    <PropertyGroup>
+      <AppBundlePath>$(AppBundleOutputRoot)$(AppBundleName)</AppBundlePath>
+      <AppBundleContentsPath>$(AppBundlePath)/Contents</AppBundleContentsPath>
+      <AppBundleMacOsPath>$(AppBundleContentsPath)/MacOS</AppBundleMacOsPath>
+      <AppBundleResourcesPath>$(AppBundleContentsPath)/Resources</AppBundleResourcesPath>
+      <AppBundleIconPath>$(AppBundleResourcesPath)/AppIcon.icns</AppBundleIconPath>
+    </PropertyGroup>
+
+    <Error Condition="'$(AppBundleOutputRoot)' == ''"
+           Text="AppBundleOutputRoot is not set." />
+    <Error Condition="!Exists('$(MacAppIconSource)')"
+           Text="Mac app bundle icon source not found: $(MacAppIconSource)" />
+    <Error Condition="!Exists('$(MacAppIconScript)')"
+           Text="Mac app icon script not found: $(MacAppIconScript)" />
+
+    <MakeDir Directories="$(AppBundleMacOsPath);$(AppBundleResourcesPath)" />
+
+    <Exec Command="bash &quot;$(MacAppIconScript)&quot; &quot;$(MacAppIconSource)&quot; &quot;$(AppBundleIconPath)&quot;" />
+
+    <ItemGroup>
+      <AppBundleSourceFiles Include="$(AppBundleOutputRoot)**/*.*"
+                            Exclude="$(AppBundleOutputRoot)$(AppBundleName)/**" />
+    </ItemGroup>
+
+    <Copy SourceFiles="@(AppBundleSourceFiles)"
+          DestinationFolder="$(AppBundleMacOsPath)/%(RecursiveDir)"
+          SkipUnchangedFiles="true" />
+    <Copy SourceFiles="$(MSBuildProjectDirectory)/Info.plist"
+          DestinationFiles="$(AppBundleContentsPath)/Info.plist"
+          SkipUnchangedFiles="true" />
+  </Target>
+
+  <Target Name="_CreateMacDmg">
+    <PropertyGroup>
+      <AppBundlePath>$(AppBundleOutputRoot)$(AppBundleName)</AppBundlePath>
+      <DmgPath>$(AppBundleOutputRoot)$(DmgName)</DmgPath>
+    </PropertyGroup>
+
+    <Error Condition="'$(AppBundleOutputRoot)' == ''"
+           Text="AppBundleOutputRoot is not set." />
+    <Error Condition="!Exists('$(AppBundlePath)')"
+           Text="App bundle not found: $(AppBundlePath)" />
+    <Error Condition="!Exists('$(MacDmgScript)')"
+           Text="Mac DMG script not found: $(MacDmgScript)" />
+
+    <Exec Command="bash &quot;$(MacDmgScript)&quot; &quot;$(AppBundlePath)&quot; &quot;$(DmgPath)&quot; &quot;$(DmgVolumeName)&quot;" />
+  </Target>
+</Project>

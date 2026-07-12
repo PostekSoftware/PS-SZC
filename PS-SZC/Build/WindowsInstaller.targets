@@ -1,0 +1,34 @@
+<Project>
+  <PropertyGroup Condition="$([MSBuild]::IsOSPlatform('Windows'))">
+    <WindowsInstallerProject>$(MSBuildProjectDirectory)\..\PS-SZC.Installer\PS-SZC.Installer.wixproj</WindowsInstallerProject>
+    <WindowsInstallerName>PS-SZC.msi</WindowsInstallerName>
+    <WindowsInstallerOutputDir>$(MSBuildProjectDirectory)\..\PS-SZC.Installer\bin\x64\$(Configuration)</WindowsInstallerOutputDir>
+    <WindowsInstallerOutput>$(WindowsInstallerOutputDir)\$(WindowsInstallerName)</WindowsInstallerOutput>
+  </PropertyGroup>
+
+  <Target Name="CreateWindowsInstaller"
+          AfterTargets="Build"
+          Condition="$([MSBuild]::IsOSPlatform('Windows'))">
+    <MSBuild Projects="$(WindowsInstallerProject)"
+             Targets="Build"
+             Properties="Configuration=$(Configuration);InstallerPlatform=x64" />
+    <Error Condition="!Exists('$(WindowsInstallerOutput)')"
+           Text="Windows installer was not created: $(WindowsInstallerOutput)" />
+    <Copy SourceFiles="$(WindowsInstallerOutput)"
+          DestinationFiles="$(TargetDir)$(WindowsInstallerName)"
+          SkipUnchangedFiles="true" />
+  </Target>
+
+  <Target Name="CreateWindowsInstallerPublish"
+          AfterTargets="Publish"
+          Condition="$([MSBuild]::IsOSPlatform('Windows'))">
+    <MSBuild Projects="$(WindowsInstallerProject)"
+             Targets="Build"
+             Properties="Configuration=$(Configuration);InstallerPlatform=x64" />
+    <Error Condition="!Exists('$(WindowsInstallerOutput)')"
+           Text="Windows installer was not created: $(WindowsInstallerOutput)" />
+    <Copy SourceFiles="$(WindowsInstallerOutput)"
+          DestinationFiles="$(PublishDir)$(WindowsInstallerName)"
+          SkipUnchangedFiles="true" />
+  </Target>
+</Project>

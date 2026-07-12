@@ -1,0 +1,24 @@
+<Project Sdk="WixToolset.Sdk/5.0.2">
+
+  <PropertyGroup>
+    <OutputType>Package</OutputType>
+    <OutputName>PS-SZC</OutputName>
+    <InstallerPlatform>x64</InstallerPlatform>
+    <Company>PostekSoftware</Company>
+    <Product>PS-SZC</Product>
+    <AssemblyVersion>1.1</AssemblyVersion>
+    <FileVersion>1.1</FileVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\PS-SZC\PS-SZC.csproj">
+      <Publish>true</Publish>
+      <Properties>RuntimeIdentifier=win-x64;SelfContained=false;PublishSingleFile=false</Properties>
+    </ProjectReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="WixToolset.DotNet.wixext" Version="5.0.2" />
+  </ItemGroup>
+
+</Project>

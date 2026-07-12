@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+  <Package Name="PS-SZC"
+           Manufacturer="PostekSoftware"
+           Version="1.0.0.0"
+           UpgradeCode="E4B8C2A1-7F3D-4E6B-9C0A-1B2C3D4E5F6A"
+           Scope="perMachine">
+
+    <MajorUpgrade DowngradeErrorMessage="A newer version of PS-SZC is already installed." />
+    <MediaTemplate EmbedCab="yes" />
+
+    <Feature Id="MainFeature" Title="PS-SZC" Level="1">
+      <ComponentGroupRef Id="PS-SZC" />
+      <ComponentRef Id="PsszcFileAssociation" />
+      <ComponentRef Id="PsszcDefaultApplicationRegistration" />
+    </Feature>
+  </Package>
+
+  <Fragment>
+    <Component Id="PsszcFileAssociation"
+               Directory="INSTALLFOLDER"
+               Bitness="always64"
+               Guid="8F3E2A1B-4C5D-6E7F-8A9B-0C1D2E3F4A5B">
+      <RegistryKey Root="HKCR" Key=".psszc">
+        <RegistryValue Type="string" Value="PSSZC.Project" KeyPath="yes" />
+      </RegistryKey>
+      <RegistryKey Root="HKCR" Key="PSSZC.Project">
+        <RegistryValue Type="string" Value="PS-SZC Project" />
+        <RegistryKey Key="FriendlyTypeName">
+          <RegistryValue Type="string" Value="PS-SZC Project" />
+        </RegistryKey>
+        <RegistryKey Key="DefaultIcon">
+          <RegistryValue Type="string" Value="[INSTALLFOLDER]PS-SZC.exe,0" />
+        </RegistryKey>
+        <RegistryKey Key="shell\open\command">
+          <RegistryValue Type="string" Value="&quot;[INSTALLFOLDER]PS-SZC.exe&quot; &quot;%1&quot;" />
+        </RegistryKey>
+      </RegistryKey>
+    </Component>
+
+    <Component Id="PsszcDefaultApplicationRegistration"
+               Directory="INSTALLFOLDER"
+               Bitness="always64"
+               Guid="1A2B3C4D-5E6F-7081-92A3-B4C5D6E7F809">
+      <RegistryKey Root="HKLM" Key="Software\PostekSoftware\PS-SZC\Capabilities\FileAssociations">
+        <RegistryValue Type="string" Name=".psszc" Value="PSSZC.Project" KeyPath="yes" />
+      </RegistryKey>
+      <RegistryKey Root="HKLM" Key="Software\RegisteredApplications">
+        <RegistryValue Type="string" Name="Software\PostekSoftware\PS-SZC\Capabilities" Value="PS-SZC" />
+      </RegistryKey>
+    </Component>
+  </Fragment>
+</Wix>
