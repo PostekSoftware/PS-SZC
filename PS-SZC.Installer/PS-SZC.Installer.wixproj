@@ -8,23 +8,21 @@
     <Product>PS-SZC</Product>
     <AssemblyVersion>1.1</AssemblyVersion>
     <FileVersion>1.1</FileVersion>
-    <AppProject>..\PS-SZC\PS-SZC.csproj</AppProject>
-    <AppPublishDir>../PS-SZC/bin/$(Configuration)/net10.0/win-x64/publish</AppPublishDir>
+    <AppProjectFullPath>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..\PS-SZC\PS-SZC.csproj'))</AppProjectFullPath>
+    <AppPublishDir>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..\PS-SZC\bin\$(Configuration)\net10.0\win-x64\publish\'))</AppPublishDir>
+    <AppPublishDirForHarvest>$(AppPublishDir.Replace('\', '/'))</AppPublishDirForHarvest>
   </PropertyGroup>
 
   <Target Name="PublishApp" BeforeTargets="BeforeBuild">
-    <MSBuild Projects="$(AppProject)"
-             Targets="Restore"
-             Properties="Configuration=$(Configuration);RuntimeIdentifier=win-x64" />
-    <MSBuild Projects="$(AppProject)"
-             Targets="Publish"
-             Properties="Configuration=$(Configuration);RuntimeIdentifier=win-x64;SelfContained=false;PublishSingleFile=false;SkipCreateWindowsInstaller=true" />
+    <MakeDir Directories="$(AppPublishDir)" />
+    <Exec Command="dotnet restore &quot;$(AppProjectFullPath)&quot; -r win-x64" />
+    <Exec Command="dotnet publish &quot;$(AppProjectFullPath)&quot; -c $(Configuration) -r win-x64 --no-self-contained /p:SkipCreateWindowsInstaller=true /p:PublishSingleFile=false /p:PublishDir=&quot;$(AppPublishDir)&quot;" />
     <Error Condition="!Exists('$(AppPublishDir)')"
            Text="Published app output not found at '$(AppPublishDir)'." />
   </Target>
 
   <ItemGroup>
-    <HarvestDirectory Include="$(AppPublishDir)">
+    <HarvestDirectory Include="$(AppPublishDirForHarvest)">
       <ComponentGroupName>AppFiles</ComponentGroupName>
       <DirectoryRefId>INSTALLFOLDER</DirectoryRefId>
       <SuppressRootDirectory>true</SuppressRootDirectory>
