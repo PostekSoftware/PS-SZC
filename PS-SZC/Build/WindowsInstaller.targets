@@ -1,38 +1,14 @@
 <Project>
   <PropertyGroup Condition="$([MSBuild]::IsOSPlatform('Windows'))">
-    <WindowsInstallerProject>$(MSBuildProjectDirectory)\..\PS-SZC.Installer\PS-SZC.Installer.wixproj</WindowsInstallerProject>
+    <WindowsInstallerProject>$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)\..\PS-SZC.Installer\PS-SZC.Installer.wixproj'))</WindowsInstallerProject>
     <WindowsInstallerName>PS-SZC.msi</WindowsInstallerName>
-    <WindowsInstallerOutputDir>$(MSBuildProjectDirectory)\..\PS-SZC.Installer\bin\x64\$(Configuration)</WindowsInstallerOutputDir>
+    <WindowsInstallerOutputDir>$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)\..\PS-SZC.Installer\bin\x64\$(Configuration)'))</WindowsInstallerOutputDir>
     <WindowsInstallerOutput>$(WindowsInstallerOutputDir)\$(WindowsInstallerName)</WindowsInstallerOutput>
+    <AppPublishDir>$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)\bin\$(Configuration)\net10.0\win-x64\publish\'))</AppPublishDir>
   </PropertyGroup>
 
-  <Target Name="CreateWindowsInstaller"
-          AfterTargets="Build"
-          Condition="$([MSBuild]::IsOSPlatform('Windows')) and '$(SkipCreateWindowsInstaller)' != 'true'">
-    <MSBuild Projects="$(WindowsInstallerProject)"
-             Targets="Restore;Build"
-             Properties="Configuration=$(Configuration);Platform=x64;InstallerPlatform=x64" />
-
-    <Error Condition="!Exists('$(WindowsInstallerOutput)')"
-           Text="Windows installer was not created: $(WindowsInstallerOutput)" />
-
-    <Copy SourceFiles="$(WindowsInstallerOutput)"
-          DestinationFiles="$(TargetDir)$(WindowsInstallerName)"
-          SkipUnchangedFiles="true" />
-  </Target>
-
-  <Target Name="CreateWindowsInstallerPublish"
-          AfterTargets="Publish"
-          Condition="$([MSBuild]::IsOSPlatform('Windows')) and '$(SkipCreateWindowsInstaller)' != 'true'">
-    <MSBuild Projects="$(WindowsInstallerProject)"
-             Targets="Restore;Build"
-             Properties="Configuration=$(Configuration);Platform=x64;InstallerPlatform=x64" />
-
-    <Error Condition="!Exists('$(WindowsInstallerOutput)')"
-           Text="Windows installer was not created: $(WindowsInstallerOutput)" />
-
-    <Copy SourceFiles="$(WindowsInstallerOutput)"
-          DestinationFiles="$(PublishDir)$(WindowsInstallerName)"
-          SkipUnchangedFiles="true" />
-  </Target>
+  <PropertyGroup Condition="$([MSBuild]::IsOSPlatform('Windows')) and '$(SkipCreateWindowsInstaller)' != 'true'">
+    <RunPostBuildEvent>OnBuildSuccess</RunPostBuildEvent>
+    <PostBuildEvent>dotnet restore "$(MSBuildProjectFullPath)" -r win-x64&#xD;&#xA;dotnet publish "$(MSBuildProjectFullPath)" -c $(Configuration) -r win-x64 --no-self-contained /p:SkipCreateWindowsInstaller=true /p:PublishSingleFile=false /p:PublishDir="$(AppPublishDir)"&#xD;&#xA;dotnet build "$(WindowsInstallerProject)" -c $(Configuration) /p:SkipPublishApp=true /p:Platform=x64&#xD;&#xA;copy /Y "$(WindowsInstallerOutput)" "$(TargetDir)$(WindowsInstallerName)"</PostBuildEvent>
+  </PropertyGroup>
 </Project>

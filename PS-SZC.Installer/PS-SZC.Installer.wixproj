@@ -13,12 +13,17 @@
     <AppPublishDirForHarvest>$(AppPublishDir.Replace('\', '/'))</AppPublishDirForHarvest>
   </PropertyGroup>
 
-  <Target Name="PublishApp" BeforeTargets="BeforeBuild">
+  <Target Name="PublishApp" BeforeTargets="BeforeBuild" Condition="'$(SkipPublishApp)' != 'true'">
     <MakeDir Directories="$(AppPublishDir)" />
     <Exec Command="dotnet restore &quot;$(AppProjectFullPath)&quot; -r win-x64" />
     <Exec Command="dotnet publish &quot;$(AppProjectFullPath)&quot; -c $(Configuration) -r win-x64 --no-self-contained /p:SkipCreateWindowsInstaller=true /p:PublishSingleFile=false /p:PublishDir=&quot;$(AppPublishDir)&quot;" />
     <Error Condition="!Exists('$(AppPublishDir)')"
            Text="Published app output not found at '$(AppPublishDir)'." />
+  </Target>
+
+  <Target Name="ValidatePublishedApp" BeforeTargets="BeforeBuild" Condition="'$(SkipPublishApp)' == 'true'">
+    <Error Condition="!Exists('$(AppPublishDir)')"
+           Text="Published app output not found at '$(AppPublishDir)'. Build PS-SZC first or build the installer without SkipPublishApp." />
   </Target>
 
   <ItemGroup>
