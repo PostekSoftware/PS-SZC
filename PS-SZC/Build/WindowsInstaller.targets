@@ -27,6 +27,10 @@
     <Error Condition="'$(WindowsInstallerCopyDir)' == ''"
            Text="WindowsInstallerCopyDir is not set." />
 
+    <MSBuild Projects="$(MSBuildProjectFile)"
+             Targets="Restore"
+             Properties="Configuration=$(Configuration);RuntimeIdentifier=win-x64" />
+
     <MSBuild Projects="$(WindowsInstallerProject)"
              Targets="Restore"
              Properties="Configuration=$(Configuration);InstallerPlatform=x64" />

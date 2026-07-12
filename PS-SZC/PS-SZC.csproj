@@ -18,6 +18,7 @@
     <PropertyGroup Condition="$([MSBuild]::IsOSPlatform('Windows'))">
         <ApplicationIcon>Content\icon.ico</ApplicationIcon>
         <UseAppHost>true</UseAppHost>
+        <RuntimeIdentifiers>win-x64</RuntimeIdentifiers>
     </PropertyGroup>
 
     <ItemGroup>
