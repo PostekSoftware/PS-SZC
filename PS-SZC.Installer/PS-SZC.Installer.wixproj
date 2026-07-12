@@ -8,13 +8,33 @@
     <Product>PS-SZC</Product>
     <AssemblyVersion>1.1</AssemblyVersion>
     <FileVersion>1.1</FileVersion>
+    <AppProject>..\PS-SZC\PS-SZC.csproj</AppProject>
+    <AppPublishDir>../PS-SZC/bin/$(Configuration)/net10.0/win-x64/publish</AppPublishDir>
   </PropertyGroup>
 
+  <Target Name="PublishApp" BeforeTargets="BeforeBuild">
+    <MSBuild Projects="$(AppProject)"
+             Targets="Restore"
+             Properties="Configuration=$(Configuration);RuntimeIdentifier=win-x64" />
+    <MSBuild Projects="$(AppProject)"
+             Targets="Publish"
+             Properties="Configuration=$(Configuration);RuntimeIdentifier=win-x64;SelfContained=false;PublishSingleFile=false;SkipCreateWindowsInstaller=true" />
+    <Error Condition="!Exists('$(AppPublishDir)')"
+           Text="Published app output not found at '$(AppPublishDir)'." />
+  </Target>
+
   <ItemGroup>
-    <ProjectReference Include="..\PS-SZC\PS-SZC.csproj">
-      <Publish>true</Publish>
-      <Properties>RuntimeIdentifier=win-x64;SelfContained=false;PublishSingleFile=false;SkipCreateWindowsInstaller=true</Properties>
-    </ProjectReference>
+    <HarvestDirectory Include="$(AppPublishDir)">
+      <ComponentGroupName>AppFiles</ComponentGroupName>
+      <DirectoryRefId>INSTALLFOLDER</DirectoryRefId>
+      <SuppressRootDirectory>true</SuppressRootDirectory>
+      <SuppressRegistry>true</SuppressRegistry>
+    </HarvestDirectory>
+    <BindPath Include="$(AppPublishDir)" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="WixToolset.Heat" Version="5.0.2" />
   </ItemGroup>
 
 </Project>

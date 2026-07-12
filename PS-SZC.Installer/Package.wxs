@@ -10,11 +10,17 @@
     <MediaTemplate EmbedCab="yes" />
 
     <Feature Id="MainFeature" Title="PS-SZC" Level="1">
-      <ComponentGroupRef Id="PS_SZC" />
+      <ComponentGroupRef Id="AppFiles" />
       <ComponentRef Id="PsszcFileAssociation" />
       <ComponentRef Id="PsszcDefaultApplicationRegistration" />
     </Feature>
   </Package>
+
+  <Fragment>
+    <StandardDirectory Id="ProgramFiles6432Folder">
+      <Directory Id="INSTALLFOLDER" Name="PS-SZC" />
+    </StandardDirectory>
+  </Fragment>
 
   <Fragment>
     <Component Id="PsszcFileAssociation"
