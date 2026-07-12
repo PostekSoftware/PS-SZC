@@ -7,8 +7,8 @@
         <Nullable>enable</Nullable>
         <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
         <Company>PostekSoftware</Company>
-        <AssemblyVersion>1.0</AssemblyVersion>
-        <FileVersion>1.0</FileVersion>
+        <AssemblyVersion>1.1</AssemblyVersion>
+        <FileVersion>1.1</FileVersion>
     </PropertyGroup>
 
     <PropertyGroup Condition="$([MSBuild]::IsOSPlatform('Windows'))">
@@ -23,8 +23,12 @@
       <PackageReference Include="Microsoft.Data.Sqlite" Version="9.0.0" />
       <PackageReference Include="Microsoft.EntityFrameworkCore" Version="9.0.0" />
       <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="9.0.0" />
+      <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="3.0.3" />
         
         <Content Include="LibraryContent/**">
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </Content>
+        <Content Include="Printing/macos-print-pdf.swift">
             <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
         </Content>
     </ItemGroup>

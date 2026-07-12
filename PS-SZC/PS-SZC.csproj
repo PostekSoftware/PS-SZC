@@ -37,6 +37,10 @@
       <Content Include="Info.plist" Condition="$([MSBuild]::IsOSPlatform('OSX'))">
         <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       </Content>
+      <Content Include="..\PS-APP\Printing\macos-print-pdf.swift" Condition="$([MSBuild]::IsOSPlatform('OSX'))">
+        <Link>macos-print-pdf.swift</Link>
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
     </ItemGroup>
 
     <ItemGroup>
@@ -44,6 +48,12 @@
     </ItemGroup>
 
     <Import Project="Build/MacAppBundle.targets" Condition="$([MSBuild]::IsOSPlatform('OSX'))" />
-    <Import Project="Build/WindowsInstaller.targets" Condition="$([MSBuild]::IsOSPlatform('Windows'))" />
+
+    <Target Name="CompileMacOsPrintHelper"
+            AfterTargets="Build"
+            BeforeTargets="CreateMacAppBundle"
+            Condition="$([MSBuild]::IsOSPlatform('OSX'))">
+        <Exec Command="bash &quot;$(MSBuildProjectDirectory)/../PS-APP/Build/compile-macos-print-helper.sh&quot; &quot;$(MSBuildProjectDirectory)/../PS-APP/Printing/macos-print-pdf.swift&quot; &quot;$(TargetDir)macos-print-pdf&quot;" />
+    </Target>
 
 </Project>

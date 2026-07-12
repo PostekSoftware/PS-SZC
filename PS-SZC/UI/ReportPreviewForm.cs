@@ -311,8 +311,10 @@ internal sealed class ReportPreviewForm : Form
         {
             var tempPath = NativePrintService.CreateTempPdfPath(ReportPdfExporter.SuggestFileName(_document));
             ReportPdfExporter.Build(_document, tempPath);
-            NativePrintService.PrintPdf(tempPath);
-            _footerMessage = LocalizedString.FromId("Report.PrintSuccess");
+            var printResult = NativePrintService.PrintPdf(tempPath);
+            _footerMessage = printResult.Message != null
+                ? LocalizedString.FromId(printResult.Message)
+                : LocalizedString.FromId("Report.PrintSuccess");
         }
         catch (Exception ex)
         {
