@@ -9,7 +9,7 @@
   <Target Name="CreateWindowsInstaller"
           AfterTargets="Build"
           Condition="$([MSBuild]::IsOSPlatform('Windows'))">
-    <Exec Command="dotnet restore &quot;$(MSBuildProjectFullPath)&quot; -c $(Configuration) -r win-x64" />
+    <Exec Command="dotnet msbuild &quot;$(MSBuildProjectFullPath)&quot; /t:Restore /p:RuntimeIdentifier=win-x64 /p:Configuration=$(Configuration)" />
 
     <MSBuild Projects="$(WindowsInstallerProject)"
              Targets="Restore;Build"
@@ -26,7 +26,7 @@
   <Target Name="CreateWindowsInstallerPublish"
           AfterTargets="Publish"
           Condition="$([MSBuild]::IsOSPlatform('Windows'))">
-    <Exec Command="dotnet restore &quot;$(MSBuildProjectFullPath)&quot; -c $(Configuration) -r win-x64" />
+    <Exec Command="dotnet msbuild &quot;$(MSBuildProjectFullPath)&quot; /t:Restore /p:RuntimeIdentifier=win-x64 /p:Configuration=$(Configuration)" />
 
     <MSBuild Projects="$(WindowsInstallerProject)"
              Targets="Restore;Build"
