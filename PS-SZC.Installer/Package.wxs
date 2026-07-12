@@ -10,7 +10,7 @@
     <MediaTemplate EmbedCab="yes" />
 
     <Feature Id="MainFeature" Title="PS-SZC" Level="1">
-      <ComponentGroupRef Id="PS-SZC" />
+      <ComponentGroupRef Id="PS_SZC" />
       <ComponentRef Id="PsszcFileAssociation" />
       <ComponentRef Id="PsszcDefaultApplicationRegistration" />
     </Feature>
