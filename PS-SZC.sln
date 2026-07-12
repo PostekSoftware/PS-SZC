@@ -1,0 +1,25 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PS-APP", "PS-APP\PS-APP.csproj", "{143913F4-D831-49EB-8042-6CCCB5C6B11A}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PS-SZC", "PS-SZC\PS-SZC.csproj", "{0216A956-82E8-417F-B79B-69711D3C54A4}"
+	ProjectSection(ProjectDependencies) = postProject
+		{143913F4-D831-49EB-8042-6CCCB5C6B11A} = {143913F4-D831-49EB-8042-6CCCB5C6B11A}
+	EndProjectSection
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{143913F4-D831-49EB-8042-6CCCB5C6B11A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{143913F4-D831-49EB-8042-6CCCB5C6B11A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{143913F4-D831-49EB-8042-6CCCB5C6B11A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{143913F4-D831-49EB-8042-6CCCB5C6B11A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{0216A956-82E8-417F-B79B-69711D3C54A4}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{0216A956-82E8-417F-B79B-69711D3C54A4}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{0216A956-82E8-417F-B79B-69711D3C54A4}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{0216A956-82E8-417F-B79B-69711D3C54A4}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal
