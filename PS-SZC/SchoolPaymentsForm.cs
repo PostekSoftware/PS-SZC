@@ -30,6 +30,8 @@ internal sealed class SchoolPaymentsForm : Form
         Children,
         Prices,
         Discounts,
+        AdditionalCosts,
+        Breaks,
         Breakdown
     }
 
@@ -51,6 +53,16 @@ internal sealed class SchoolPaymentsForm : Form
     private string _newDiscountAmount = "50";
     private int _newDiscountYear = DateTime.Today.Year;
     private int _newDiscountMonth = DateTime.Today.Month;
+
+    private string _newCostAmount = "100";
+    private int _newCostYear = DateTime.Today.Year;
+    private int _newCostMonth = DateTime.Today.Month;
+    private string _newCostNote = string.Empty;
+
+    private int _newBreakFromYear = DateTime.Today.Year;
+    private int _newBreakToYear = DateTime.Today.Year;
+    private bool _newBreakIndefinite;
+    private readonly bool[] _newBreakMonths = new bool[12];
 
     private string _newTransferAmount = "500";
     private string _newTransferNote = string.Empty;
@@ -105,6 +117,8 @@ internal sealed class SchoolPaymentsForm : Form
     private int _editingChildId;
     private int _editingPriceId;
     private int _editingDiscountId;
+    private int _editingCostId;
+    private int _editingBreakId;
     private int _editingTransferId;
 
     private bool _showExitConfirmation;
@@ -336,6 +350,8 @@ internal sealed class SchoolPaymentsForm : Form
         var throughMonth = new BillingMonth(_viewYear, _viewMonth);
         var familyPrices = context.FamilyPrices.AsNoTracking().ToList();
         var discounts = context.FamilyDiscounts.AsNoTracking().ToList();
+        var additionalCosts = context.FamilyAdditionalCosts.AsNoTracking().ToList();
+        var breaks = context.FamilyBreaks.AsNoTracking().ToList();
         var transfers = context.Transfers.AsNoTracking().ToList();
 
         if (ImGui.Button(LocalizedString.FromId("Family.AddFamily")))
@@ -369,7 +385,7 @@ internal sealed class SchoolPaymentsForm : Form
             .Select(family => (
                 Family: family,
                 Summary: PaymentBalanceService.CalculateFamilyBalance(
-                    family, familyPrices, discounts, transfers, throughMonth)))
+                    family, familyPrices, discounts, additionalCosts, breaks, transfers, throughMonth)))
             .ToList();
 
         var filteredFamilyRows = familyRows
@@ -446,9 +462,11 @@ internal sealed class SchoolPaymentsForm : Form
         var family = _session.LoadFamilyDetails(_selectedFamilyId);
         var familyPrices = context.FamilyPrices.AsNoTracking().ToList();
         var discounts = context.FamilyDiscounts.AsNoTracking().ToList();
+        var additionalCosts = context.FamilyAdditionalCosts.AsNoTracking().ToList();
+        var breaks = context.FamilyBreaks.AsNoTracking().ToList();
         var transfers = context.Transfers.AsNoTracking().ToList();
         var summary = PaymentBalanceService.CalculateFamilyBalance(
-            family, familyPrices, discounts, transfers, throughMonth);
+            family, familyPrices, discounts, additionalCosts, breaks, transfers, throughMonth);
 
         ImGui.Spacing();
         ImGui.SeparatorText(LocalizedString.FromId("Family.Header", () => summary.DisplayName));
@@ -473,6 +491,10 @@ internal sealed class SchoolPaymentsForm : Form
                 DrawFamilyPricingSection(family));
             DrawFamilyEditorTab(FamilyEditorTab.Discounts, LocalizedString.FromId("Family.Editor.Discounts"), () =>
                 DrawFamilyDiscountSection(family));
+            DrawFamilyEditorTab(FamilyEditorTab.AdditionalCosts, LocalizedString.FromId("Family.Editor.AdditionalCosts"), () =>
+                DrawFamilyAdditionalCostSection(family));
+            DrawFamilyEditorTab(FamilyEditorTab.Breaks, LocalizedString.FromId("Family.Editor.Breaks"), () =>
+                DrawFamilyBreakSection(family));
             DrawFamilyEditorTab(FamilyEditorTab.Breakdown, LocalizedString.FromId("Family.Editor.Breakdown"), () =>
                 DrawFamilyMonthlyBreakdown(summary));
             ImGui.EndTabBar();
@@ -506,6 +528,7 @@ internal sealed class SchoolPaymentsForm : Form
         ImGui.Text($"{LocalizedString.FromId("Family.TotalTransfers")}: {FormatMoney(summary.TotalTransfers)}");
         ImGui.Text($"{LocalizedString.FromId("Family.TotalCharges")}: {FormatMoney(summary.TotalNetCharges)}");
         ImGui.Text($"{LocalizedString.FromId("Family.TotalDiscounts")}: {FormatMoney(summary.TotalDiscounts)}");
+        ImGui.Text($"{LocalizedString.FromId("Family.TotalAdditionalCosts")}: {FormatMoney(summary.TotalAdditionalCosts)}");
 
         ImGui.Spacing();
         ImGui.InputText($"{LocalizedString.FromId("Family.StartingBalance")}##family", ref _startingBalanceText, 32);
@@ -724,6 +747,164 @@ internal sealed class SchoolPaymentsForm : Form
             ClearDiscountForm();
     }
 
+    private void DrawFamilyAdditionalCostSection(Family family)
+    {
+        ImGui.TextWrapped(LocalizedString.FromId("Family.AdditionalCostsHint"));
+
+        var costs = family.AdditionalCosts.ToList();
+        if (ImGui.BeginTable("FamilyAdditionalCosts", 4, SortableTable.BaseFlags))
+        {
+            ImGui.TableSetupColumn(LocalizedString.FromId("Report.Column.Month"), ImGuiTableColumnFlags.DefaultSort);
+            ImGui.TableSetupColumn(LocalizedString.FromId("Family.AdditionalCostAmount"));
+            ImGui.TableSetupColumn(LocalizedString.FromId("Field.Note"));
+            ImGui.TableSetupColumn(LocalizedString.FromId("Family.Actions"), ImGuiTableColumnFlags.NoSort);
+            ImGui.TableHeadersRow();
+
+            SortableTable.Sort(costs, ImGui.TableGetSortSpecs(), (cost, column) => column switch
+            {
+                0 => cost.Year * 100 + cost.Month,
+                1 => cost.Amount,
+                2 => cost.Note,
+                _ => null
+            });
+
+            foreach (var cost in costs)
+            {
+                ImGui.TableNextRow();
+                ImGui.TableNextColumn();
+                ImGui.Text($"{cost.Year}-{cost.Month:D2}");
+                ImGui.TableNextColumn();
+                ImGui.Text(FormatMoney(cost.Amount));
+                ImGui.TableNextColumn();
+                ImGui.Text(cost.Note ?? string.Empty);
+                ImGui.TableNextColumn();
+                if (ImGui.SmallButton($"{LocalizedString.FromId("Family.Edit")}##fc{cost.Id}"))
+                    BeginEditCost(cost);
+                ImGui.SameLine();
+                if (ImGui.SmallButton($"{LocalizedString.FromId("Family.Delete")}##fc{cost.Id}"))
+                {
+                    if (_editingCostId == cost.Id)
+                        ClearCostForm();
+
+                    _session.Context!.FamilyAdditionalCosts.Remove(cost);
+                    _session.SaveChanges();
+                }
+            }
+
+            ImGui.EndTable();
+        }
+
+        ImGui.SeparatorText(_editingCostId > 0
+            ? LocalizedString.FromId("Family.EditAdditionalCost")
+            : LocalizedString.FromId("Family.AddAdditionalCost"));
+        ImGui.InputInt($"{LocalizedString.FromId("Field.CostYear")}##familyCost", ref _newCostYear);
+        ImGui.InputInt($"{LocalizedString.FromId("Field.CostMonth")}##familyCost", ref _newCostMonth);
+        ImGui.InputText($"{LocalizedString.FromId("Family.AdditionalCostAmount")}##familyCost", ref _newCostAmount, 32);
+        ImGui.InputText($"{LocalizedString.FromId("Field.Note")}##familyCost", ref _newCostNote, 256);
+        if (ImGui.Button(_editingCostId > 0
+                ? LocalizedString.FromId("Family.Save")
+                : LocalizedString.FromId("Family.AddAdditionalCost")))
+        {
+            SaveFamilyAdditionalCost(family.Id);
+        }
+
+        if (_editingCostId > 0 && ImGui.Button(LocalizedString.FromId("Family.Cancel")))
+            ClearCostForm();
+    }
+
+    private void DrawFamilyBreakSection(Family family)
+    {
+        ImGui.TextWrapped(LocalizedString.FromId("Family.BreaksHint"));
+
+        var breaks = family.Breaks.ToList();
+        if (ImGui.BeginTable("FamilyBreaks", 3, SortableTable.BaseFlags))
+        {
+            ImGui.TableSetupColumn(LocalizedString.FromId("Family.BreakYears"), ImGuiTableColumnFlags.DefaultSort);
+            ImGui.TableSetupColumn(LocalizedString.FromId("Family.BreakMonths"), ImGuiTableColumnFlags.WidthStretch);
+            ImGui.TableSetupColumn(LocalizedString.FromId("Family.Actions"), ImGuiTableColumnFlags.NoSort);
+            ImGui.TableHeadersRow();
+
+            SortableTable.Sort(breaks, ImGui.TableGetSortSpecs(), (breakEntry, column) => column switch
+            {
+                0 => breakEntry.FromYear,
+                1 => breakEntry.MonthsMask,
+                _ => null
+            });
+
+            foreach (var breakEntry in breaks)
+            {
+                ImGui.TableNextRow();
+                ImGui.TableNextColumn();
+                ImGui.Text(FormatBreakYears(breakEntry));
+                ImGui.TableNextColumn();
+                ImGui.Text(FormatBreakMonths(breakEntry.MonthsMask));
+                ImGui.TableNextColumn();
+                if (ImGui.SmallButton($"{LocalizedString.FromId("Family.Edit")}##fb{breakEntry.Id}"))
+                    BeginEditBreak(breakEntry);
+                ImGui.SameLine();
+                if (ImGui.SmallButton($"{LocalizedString.FromId("Family.Delete")}##fb{breakEntry.Id}"))
+                {
+                    if (_editingBreakId == breakEntry.Id)
+                        ClearBreakForm();
+
+                    _session.Context!.FamilyBreaks.Remove(breakEntry);
+                    _session.SaveChanges();
+                }
+            }
+
+            ImGui.EndTable();
+        }
+
+        ImGui.SeparatorText(_editingBreakId > 0
+            ? LocalizedString.FromId("Family.EditBreak")
+            : LocalizedString.FromId("Family.AddBreak"));
+        ImGui.InputInt($"{LocalizedString.FromId("Field.BreakFromYear")}##familyBreak", ref _newBreakFromYear);
+        ImGui.Checkbox($"{LocalizedString.FromId("Family.BreakNoEndYear")}##familyBreak", ref _newBreakIndefinite);
+        if (!_newBreakIndefinite)
+            ImGui.InputInt($"{LocalizedString.FromId("Field.BreakToYear")}##familyBreak", ref _newBreakToYear);
+
+        ImGui.Spacing();
+        ImGui.Text(LocalizedString.FromId("Family.BreakMonths"));
+        for (var month = 1; month <= 12; month++)
+        {
+            if ((month - 1) % 6 != 0)
+                ImGui.SameLine();
+
+            ImGui.Checkbox(
+                $"{LocalizedString.FromId($"Month.Short.{month}")}##breakMonth{month}",
+                ref _newBreakMonths[month - 1]);
+        }
+
+        if (ImGui.Button(_editingBreakId > 0
+                ? LocalizedString.FromId("Family.Save")
+                : LocalizedString.FromId("Family.AddBreak")))
+        {
+            SaveFamilyBreak(family.Id);
+        }
+
+        if (_editingBreakId > 0 && ImGui.Button(LocalizedString.FromId("Family.Cancel")))
+            ClearBreakForm();
+    }
+
+    private static string FormatBreakYears(FamilyBreak breakEntry) =>
+        breakEntry.ToYear == null
+            ? $"{breakEntry.FromYear} — {LocalizedString.FromId("Family.PriceOngoing")}"
+            : breakEntry.FromYear == breakEntry.ToYear.Value
+                ? breakEntry.FromYear.ToString(CultureInfo.InvariantCulture)
+                : $"{breakEntry.FromYear} — {breakEntry.ToYear.Value}";
+
+    private static string FormatBreakMonths(int monthsMask)
+    {
+        var names = new List<string>();
+        for (var month = 1; month <= 12; month++)
+        {
+            if ((monthsMask & (1 << (month - 1))) != 0)
+                names.Add(LocalizedString.FromId($"Month.Short.{month}"));
+        }
+
+        return string.Join(", ", names);
+    }
+
     private void DrawFamilyMonthlyBreakdown(FamilyBalanceSummary summary)
     {
         if (summary.MonthlyCharges.Count == 0)
@@ -733,11 +914,12 @@ internal sealed class SchoolPaymentsForm : Form
         }
 
         var monthlyCharges = summary.MonthlyCharges.ToList();
-        if (ImGui.BeginTable("MonthlyBreakdown", 4, SortableTable.BaseFlags | ImGuiTableFlags.ScrollY, new Vector2(0, 0)))
+        if (ImGui.BeginTable("MonthlyBreakdown", 5, SortableTable.BaseFlags | ImGuiTableFlags.ScrollY, new Vector2(0, 0)))
         {
             ImGui.TableSetupColumn(LocalizedString.FromId("Report.Column.Month"), ImGuiTableColumnFlags.DefaultSort);
             ImGui.TableSetupColumn(LocalizedString.FromId("Report.Column.Gross"));
             ImGui.TableSetupColumn(LocalizedString.FromId("Report.Column.Discount"));
+            ImGui.TableSetupColumn(LocalizedString.FromId("Report.Column.AdditionalCosts"));
             ImGui.TableSetupColumn(LocalizedString.FromId("Report.Column.Net"));
             ImGui.TableHeadersRow();
 
@@ -746,7 +928,8 @@ internal sealed class SchoolPaymentsForm : Form
                 0 => charge.Month.Year * 100 + charge.Month.Month,
                 1 => charge.GrossAmount,
                 2 => charge.DiscountAmount,
-                3 => charge.NetAmount,
+                3 => charge.AdditionalCostAmount,
+                4 => charge.NetAmount,
                 _ => null
             });
 
@@ -759,6 +942,8 @@ internal sealed class SchoolPaymentsForm : Form
                 ImGui.Text(FormatMoney(charge.GrossAmount));
                 ImGui.TableNextColumn();
                 ImGui.Text(FormatMoney(charge.DiscountAmount));
+                ImGui.TableNextColumn();
+                ImGui.Text(FormatMoney(charge.AdditionalCostAmount));
                 ImGui.TableNextColumn();
                 ImGui.Text(FormatMoney(charge.NetAmount));
             }
@@ -868,6 +1053,8 @@ internal sealed class SchoolPaymentsForm : Form
         var throughMonth = new BillingMonth(_viewYear, _viewMonth);
         var familyPrices = context.FamilyPrices.AsNoTracking().ToList();
         var discounts = context.FamilyDiscounts.AsNoTracking().ToList();
+        var additionalCosts = context.FamilyAdditionalCosts.AsNoTracking().ToList();
+        var breaks = context.FamilyBreaks.AsNoTracking().ToList();
         var transfers = context.Transfers.AsNoTracking().ToList();
 
         ImGui.SetNextItemWidth(Math.Min(420f, ImGui.GetContentRegionAvail().X));
@@ -907,7 +1094,7 @@ internal sealed class SchoolPaymentsForm : Form
             .Select(family => (
                 Family: family,
                 Summary: PaymentBalanceService.CalculateFamilyBalance(
-                    family, familyPrices, discounts, transfers, throughMonth)))
+                    family, familyPrices, discounts, additionalCosts, breaks, transfers, throughMonth)))
             .Where(row =>
                 FamilySearchService.Matches(row.Family, _summarySearch)
                 && MatchesSummaryBalanceFilter(row.Summary, _summaryBalanceFilter))
@@ -1107,6 +1294,8 @@ internal sealed class SchoolPaymentsForm : Form
         var toMonth = new BillingMonth(_reportToYear, Math.Clamp(_reportToMonth, 1, 12));
         var prices = context.FamilyPrices.AsNoTracking().ToList();
         var discounts = context.FamilyDiscounts.AsNoTracking().ToList();
+        var additionalCosts = context.FamilyAdditionalCosts.AsNoTracking().ToList();
+        var breaks = context.FamilyBreaks.AsNoTracking().ToList();
         var transfers = context.Transfers.AsNoTracking().ToList();
 
         decimal? minPaymentAmount = null;
@@ -1130,6 +1319,8 @@ internal sealed class SchoolPaymentsForm : Form
             families,
             prices,
             discounts,
+            additionalCosts,
+            breaks,
             transfers,
             fromMonth,
             toMonth,
@@ -1254,6 +1445,43 @@ internal sealed class SchoolPaymentsForm : Form
         _newDiscountAmount = "50";
     }
 
+    private void BeginEditCost(FamilyAdditionalCost cost)
+    {
+        _editingCostId = cost.Id;
+        _newCostYear = cost.Year;
+        _newCostMonth = cost.Month;
+        _newCostAmount = cost.Amount.ToString(CultureInfo.InvariantCulture);
+        _newCostNote = cost.Note ?? string.Empty;
+    }
+
+    private void ClearCostForm()
+    {
+        _editingCostId = 0;
+        _newCostYear = DateTime.Today.Year;
+        _newCostMonth = DateTime.Today.Month;
+        _newCostAmount = "100";
+        _newCostNote = string.Empty;
+    }
+
+    private void BeginEditBreak(FamilyBreak breakEntry)
+    {
+        _editingBreakId = breakEntry.Id;
+        _newBreakFromYear = breakEntry.FromYear;
+        _newBreakIndefinite = breakEntry.ToYear == null;
+        _newBreakToYear = breakEntry.ToYear ?? breakEntry.FromYear;
+        for (var month = 1; month <= 12; month++)
+            _newBreakMonths[month - 1] = breakEntry.IncludesMonth(month);
+    }
+
+    private void ClearBreakForm()
+    {
+        _editingBreakId = 0;
+        _newBreakFromYear = DateTime.Today.Year;
+        _newBreakToYear = DateTime.Today.Year;
+        _newBreakIndefinite = false;
+        Array.Clear(_newBreakMonths);
+    }
+
     private void BeginEditTransfer(int transferId)
     {
         var transfer = _session.Context!.Transfers.First(x => x.Id == transferId);
@@ -1366,6 +1594,92 @@ internal sealed class SchoolPaymentsForm : Form
         ClearDiscountForm();
     }
 
+    private void SaveFamilyAdditionalCost(int familyId)
+    {
+        if (!TryParseMoney(_newCostAmount, out var amount))
+        {
+            SetStatus(LocalizedString.FromId("Status.InvalidAdditionalCost"));
+            return;
+        }
+
+        var context = _session.Context!;
+        var month = Math.Clamp(_newCostMonth, 1, 12);
+        var note = string.IsNullOrWhiteSpace(_newCostNote) ? null : _newCostNote.Trim();
+
+        if (_editingCostId > 0)
+        {
+            var cost = context.FamilyAdditionalCosts.First(x => x.Id == _editingCostId);
+            cost.Year = _newCostYear;
+            cost.Month = month;
+            cost.Amount = amount;
+            cost.Note = note;
+            SetStatus(LocalizedString.FromId("Status.AdditionalCostUpdated"));
+        }
+        else
+        {
+            context.FamilyAdditionalCosts.Add(new FamilyAdditionalCost
+            {
+                FamilyId = familyId,
+                Year = _newCostYear,
+                Month = month,
+                Amount = amount,
+                Note = note
+            });
+            SetStatus(LocalizedString.FromId("Status.AdditionalCostAdded"));
+        }
+
+        _session.SaveChanges();
+        ClearCostForm();
+    }
+
+    private void SaveFamilyBreak(int familyId)
+    {
+        var monthsMask = 0;
+        for (var month = 1; month <= 12; month++)
+        {
+            if (_newBreakMonths[month - 1])
+                monthsMask |= 1 << (month - 1);
+        }
+
+        if (monthsMask == 0)
+        {
+            SetStatus(LocalizedString.FromId("Status.BreakMonthsRequired"));
+            return;
+        }
+
+        int? toYear = _newBreakIndefinite ? null : _newBreakToYear;
+        if (toYear != null && toYear.Value < _newBreakFromYear)
+        {
+            SetStatus(LocalizedString.FromId("Status.BreakInvalidYears"));
+            return;
+        }
+
+        var context = _session.Context!;
+
+        if (_editingBreakId > 0)
+        {
+            var breakEntry = context.FamilyBreaks.First(x => x.Id == _editingBreakId);
+            breakEntry.FromYear = _newBreakFromYear;
+            breakEntry.ToYear = toYear;
+            breakEntry.MonthsMask = monthsMask;
+            SetStatus(LocalizedString.FromId("Status.BreakUpdated"));
+        }
+        else
+        {
+            context.FamilyBreaks.Add(new FamilyBreak
+            {
+                FamilyId = familyId,
+                FromYear = _newBreakFromYear,
+                ToYear = toYear,
+                MonthsMask = monthsMask
+            });
+            SetStatus(LocalizedString.FromId("Status.BreakAdded"));
+        }
+
+        _session.SaveChanges();
+        ClearBreakForm();
+    }
+
     private void SaveTransfer()
     {
         if (!TryParseMoney(_newTransferAmount, out var amount))
@@ -1435,6 +1749,8 @@ internal sealed class SchoolPaymentsForm : Form
         ClearChildForm();
         ClearPriceForm();
         ClearDiscountForm();
+        ClearCostForm();
+        ClearBreakForm();
     }
 
     private static void EnsureParents(SchoolPaymentsContext context, Family family)

@@ -16,6 +16,7 @@ public sealed record DuesByMonthRow(
     BillingMonth Month,
     decimal GrossAmount,
     decimal DiscountAmount,
+    decimal AdditionalCostAmount,
     decimal NetAmount);
 
 public sealed record PaymentsByMonthRow(
@@ -78,6 +79,8 @@ public static class ReportService
         IReadOnlyList<Family> families,
         IReadOnlyList<FamilyPrice> prices,
         IReadOnlyList<FamilyDiscount> discounts,
+        IReadOnlyList<FamilyAdditionalCost> additionalCosts,
+        IReadOnlyList<FamilyBreak> breaks,
         IReadOnlyList<Transfer> transfers,
         BillingMonth fromMonth,
         BillingMonth toMonth,
@@ -86,11 +89,11 @@ public static class ReportService
         kind switch
         {
             ReportKind.DuesByMonth => BuildDuesByMonthReport(
-                families, prices, discounts, fromMonth, toMonth, filters, allFamiliesLabel),
+                families, prices, discounts, additionalCosts, breaks, fromMonth, toMonth, filters, allFamiliesLabel),
             ReportKind.PaymentsByMonth => BuildPaymentsByMonthReport(
                 families, transfers, fromMonth, toMonth, filters, allFamiliesLabel),
             ReportKind.AccountStatus => BuildAccountStatusReport(
-                families, prices, discounts, transfers, fromMonth, toMonth, filters, allFamiliesLabel),
+                families, prices, discounts, additionalCosts, breaks, transfers, fromMonth, toMonth, filters, allFamiliesLabel),
             _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, null)
         };
 
@@ -98,6 +101,8 @@ public static class ReportService
         IReadOnlyList<Family> families,
         IReadOnlyList<FamilyPrice> prices,
         IReadOnlyList<FamilyDiscount> discounts,
+        IReadOnlyList<FamilyAdditionalCost> additionalCosts,
+        IReadOnlyList<FamilyBreak> breaks,
         BillingMonth fromMonth,
         BillingMonth toMonth,
         ReportFilters filters,
@@ -111,7 +116,7 @@ public static class ReportService
         foreach (var family in targetFamilies)
         {
             var summary = PaymentBalanceService.CalculateFamilyBalance(
-                family, prices, discounts, [], rangeTo);
+                family, prices, discounts, additionalCosts, breaks, [], rangeTo);
 
             foreach (var charge in summary.MonthlyCharges)
             {
@@ -130,6 +135,7 @@ public static class ReportService
                     charge.Month,
                     charge.GrossAmount,
                     charge.DiscountAmount,
+                    charge.AdditionalCostAmount,
                     charge.NetAmount));
             }
         }
@@ -209,6 +215,8 @@ public static class ReportService
         IReadOnlyList<Family> families,
         IReadOnlyList<FamilyPrice> prices,
         IReadOnlyList<FamilyDiscount> discounts,
+        IReadOnlyList<FamilyAdditionalCost> additionalCosts,
+        IReadOnlyList<FamilyBreak> breaks,
         IReadOnlyList<Transfer> transfers,
         BillingMonth fromMonth,
         BillingMonth toMonth,
@@ -227,7 +235,7 @@ public static class ReportService
             .Select(family =>
             {
                 var summary = PaymentBalanceService.CalculateFamilyBalance(
-                    family, prices, discounts, transfers, throughMonth);
+                    family, prices, discounts, additionalCosts, breaks, transfers, throughMonth);
 
                 var (status, statusAmount) = summary.IsOverpaid
                     ? (ReportBalanceStatus.Overpaid, summary.OverpaidAmount)

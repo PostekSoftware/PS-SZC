@@ -16,6 +16,10 @@ public sealed class Family
 
     public ICollection<FamilyDiscount> Discounts { get; set; } = [];
 
+    public ICollection<FamilyAdditionalCost> AdditionalCosts { get; set; } = [];
+
+    public ICollection<FamilyBreak> Breaks { get; set; } = [];
+
     public ICollection<Transfer> Transfers { get; set; } = [];
 }
 
@@ -83,6 +87,45 @@ public sealed class FamilyDiscount
     public decimal Amount { get; set; }
 }
 
+public sealed class FamilyAdditionalCost
+{
+    public int Id { get; set; }
+
+    public int FamilyId { get; set; }
+
+    public Family Family { get; set; } = null!;
+
+    public int Year { get; set; }
+
+    public int Month { get; set; }
+
+    public decimal Amount { get; set; }
+
+    public string? Note { get; set; }
+}
+
+public sealed class FamilyBreak
+{
+    public int Id { get; set; }
+
+    public int FamilyId { get; set; }
+
+    public Family Family { get; set; } = null!;
+
+    public int FromYear { get; set; }
+
+    /// <summary>End year of the break range (inclusive). Null means the break has no end year.</summary>
+    public int? ToYear { get; set; }
+
+    /// <summary>Bitmask of months the break applies to. Bit 0 = January, bit 11 = December.</summary>
+    public int MonthsMask { get; set; }
+
+    public bool IncludesMonth(int month) => (MonthsMask & (1 << (month - 1))) != 0;
+
+    public bool AppliesTo(int year, int month) =>
+        year >= FromYear && (ToYear == null || year <= ToYear.Value) && IncludesMonth(month);
+}
+
 public sealed class Transfer
 {
     public int Id { get; set; }
@@ -116,6 +159,10 @@ public sealed class SchoolPaymentsContext : DbContext
     public DbSet<FamilyPrice> FamilyPrices => Set<FamilyPrice>();
 
     public DbSet<FamilyDiscount> FamilyDiscounts => Set<FamilyDiscount>();
+
+    public DbSet<FamilyAdditionalCost> FamilyAdditionalCosts => Set<FamilyAdditionalCost>();
+
+    public DbSet<FamilyBreak> FamilyBreaks => Set<FamilyBreak>();
 
     public DbSet<Transfer> Transfers => Set<Transfer>();
 
@@ -165,6 +212,22 @@ public sealed class SchoolPaymentsContext : DbContext
             entity.Property(x => x.Amount).HasPrecision(18, 2);
             entity.HasIndex(x => new { x.FamilyId, x.Year, x.Month }).IsUnique();
             entity.HasOne(x => x.Family).WithMany(x => x.Discounts).HasForeignKey(x => x.FamilyId);
+        });
+
+        modelBuilder.Entity<FamilyAdditionalCost>(entity =>
+        {
+            entity.ToTable("family_additional_costs");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Amount).HasPrecision(18, 2);
+            entity.HasIndex(x => new { x.FamilyId, x.Year, x.Month });
+            entity.HasOne(x => x.Family).WithMany(x => x.AdditionalCosts).HasForeignKey(x => x.FamilyId);
+        });
+
+        modelBuilder.Entity<FamilyBreak>(entity =>
+        {
+            entity.ToTable("family_breaks");
+            entity.HasKey(x => x.Id);
+            entity.HasOne(x => x.Family).WithMany(x => x.Breaks).HasForeignKey(x => x.FamilyId);
         });
 
         modelBuilder.Entity<Transfer>(entity =>

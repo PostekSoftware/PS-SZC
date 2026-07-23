@@ -32,6 +32,7 @@ public sealed record MonthlyCharge(
     BillingMonth Month,
     decimal GrossAmount,
     decimal DiscountAmount,
+    decimal AdditionalCostAmount,
     decimal NetAmount);
 
 public sealed record FamilyBalanceSummary(
@@ -41,6 +42,7 @@ public sealed record FamilyBalanceSummary(
     decimal TotalTransfers,
     decimal TotalGrossCharges,
     decimal TotalDiscounts,
+    decimal TotalAdditionalCosts,
     decimal TotalNetCharges,
     decimal CurrentBalance,
     IReadOnlyList<MonthlyCharge> MonthlyCharges)
@@ -86,6 +88,17 @@ public static class PaymentBalanceService
         discounts.FirstOrDefault(x =>
             x.FamilyId == familyId && x.Year == month.Year && x.Month == month.Month)?.Amount ?? 0;
 
+    public static decimal GetMonthlyAdditionalCost(
+        int familyId,
+        BillingMonth month,
+        IReadOnlyList<FamilyAdditionalCost> additionalCosts) =>
+        additionalCosts
+            .Where(x => x.FamilyId == familyId && x.Year == month.Year && x.Month == month.Month)
+            .Sum(x => x.Amount);
+
+    public static bool IsBreakMonth(int familyId, BillingMonth month, IReadOnlyList<FamilyBreak> breaks) =>
+        breaks.Any(x => x.FamilyId == familyId && x.AppliesTo(month.Year, month.Month));
+
     public static BillingMonth? GetPriceAppliesUntilMonth(FamilyPrice price, IReadOnlyList<FamilyPrice> familyPrices)
     {
         var current = new BillingMonth(price.EffectiveYear, price.EffectiveMonth);
@@ -113,34 +126,54 @@ public static class PaymentBalanceService
         Family family,
         IReadOnlyList<FamilyPrice> familyPrices,
         IReadOnlyList<FamilyDiscount> discounts,
+        IReadOnlyList<FamilyAdditionalCost> additionalCosts,
+        IReadOnlyList<FamilyBreak> breaks,
         IReadOnlyList<Transfer> transfers,
         BillingMonth throughMonth)
     {
         var familyPricesForFamily = familyPrices.Where(x => x.FamilyId == family.Id).ToList();
         var discountsForFamily = discounts.Where(x => x.FamilyId == family.Id).ToList();
+        var additionalCostsForFamily = additionalCosts.Where(x => x.FamilyId == family.Id).ToList();
+        var breaksForFamily = breaks.Where(x => x.FamilyId == family.Id).ToList();
         var transfersForFamily = transfers.Where(x => x.FamilyId == family.Id).ToList();
         var start = GetFamilyBillingStartMonth(family.Id, familyPricesForFamily);
+
+        foreach (var cost in additionalCostsForFamily)
+        {
+            var costMonth = new BillingMonth(cost.Year, cost.Month);
+            start = start == null || costMonth.CompareTo(start.Value) < 0 ? costMonth : start;
+        }
+
         var monthlyCharges = new List<MonthlyCharge>();
 
         if (start != null)
         {
             for (var month = start.Value; month.IsOnOrBefore(throughMonth); month = month.AddMonths(1))
             {
-                var gross = GetMonthlyPrice(family.Id, month, familyPricesForFamily);
-                if (gross <= 0)
+                var gross = IsBreakMonth(family.Id, month, breaksForFamily)
+                    ? 0
+                    : GetMonthlyPrice(family.Id, month, familyPricesForFamily);
+                var additionalCost = GetMonthlyAdditionalCost(family.Id, month, additionalCostsForFamily);
+
+                if (gross <= 0 && additionalCost == 0)
                     continue;
+
+                if (gross < 0)
+                    gross = 0;
 
                 var discount = GetMonthlyDiscount(family.Id, month, discountsForFamily);
                 if (discount > gross)
                     discount = gross;
 
-                monthlyCharges.Add(new MonthlyCharge(month, gross, discount, gross - discount));
+                monthlyCharges.Add(new MonthlyCharge(
+                    month, gross, discount, additionalCost, gross - discount + additionalCost));
             }
         }
 
         var totalTransfers = transfersForFamily.Sum(x => x.Amount);
         var totalGross = monthlyCharges.Sum(x => x.GrossAmount);
         var totalDiscounts = monthlyCharges.Sum(x => x.DiscountAmount);
+        var totalAdditionalCosts = monthlyCharges.Sum(x => x.AdditionalCostAmount);
         var totalNet = monthlyCharges.Sum(x => x.NetAmount);
         var currentBalance = family.StartingBalance + totalTransfers - totalNet;
 
@@ -151,6 +184,7 @@ public static class PaymentBalanceService
             totalTransfers,
             totalGross,
             totalDiscounts,
+            totalAdditionalCosts,
             totalNet,
             currentBalance,
             monthlyCharges);

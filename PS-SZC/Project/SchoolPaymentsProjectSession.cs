@@ -299,6 +299,45 @@ internal sealed class SchoolPaymentsProjectSession : IDisposable
             SchoolPaymentsContext.DatabaseName,
             options => new SchoolPaymentsContext(options));
         _context.Database.EnsureCreated();
+        UpgradeDatabaseSchema(_context);
+    }
+
+    /// <summary>
+    /// Adds tables introduced after the initial release to databases created by older
+    /// versions. <see cref="Microsoft.EntityFrameworkCore.Infrastructure.DatabaseFacade.EnsureCreated"/>
+    /// is a no-op when the database already exists, so new tables must be created explicitly.
+    /// </summary>
+    private static void UpgradeDatabaseSchema(SchoolPaymentsContext context)
+    {
+        context.Database.ExecuteSqlRaw(
+            """
+            CREATE TABLE IF NOT EXISTS "family_additional_costs" (
+                "Id" INTEGER NOT NULL CONSTRAINT "PK_family_additional_costs" PRIMARY KEY AUTOINCREMENT,
+                "FamilyId" INTEGER NOT NULL,
+                "Year" INTEGER NOT NULL,
+                "Month" INTEGER NOT NULL,
+                "Amount" TEXT NOT NULL,
+                "Note" TEXT NULL,
+                CONSTRAINT "FK_family_additional_costs_families_FamilyId"
+                    FOREIGN KEY ("FamilyId") REFERENCES "families" ("Id") ON DELETE CASCADE
+            );
+
+            CREATE INDEX IF NOT EXISTS "IX_family_additional_costs_FamilyId_Year_Month"
+                ON "family_additional_costs" ("FamilyId", "Year", "Month");
+
+            CREATE TABLE IF NOT EXISTS "family_breaks" (
+                "Id" INTEGER NOT NULL CONSTRAINT "PK_family_breaks" PRIMARY KEY AUTOINCREMENT,
+                "FamilyId" INTEGER NOT NULL,
+                "FromYear" INTEGER NOT NULL,
+                "ToYear" INTEGER NULL,
+                "MonthsMask" INTEGER NOT NULL,
+                CONSTRAINT "FK_family_breaks_families_FamilyId"
+                    FOREIGN KEY ("FamilyId") REFERENCES "families" ("Id") ON DELETE CASCADE
+            );
+
+            CREATE INDEX IF NOT EXISTS "IX_family_breaks_FamilyId"
+                ON "family_breaks" ("FamilyId");
+            """);
     }
 
     public void SaveChanges()
@@ -319,6 +358,8 @@ internal sealed class SchoolPaymentsProjectSession : IDisposable
             .Include(x => x.Children)
             .Include(x => x.Prices)
             .Include(x => x.Discounts)
+            .Include(x => x.AdditionalCosts)
+            .Include(x => x.Breaks)
             .Include(x => x.Transfers)
             .First(x => x.Id == familyId);
     }

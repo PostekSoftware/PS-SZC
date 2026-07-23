@@ -63,6 +63,7 @@ public static class ReportCsvExporter
             Header("Report.Column.Month"),
             Header("Report.Column.Gross"),
             Header("Report.Column.Discount"),
+            Header("Report.Column.AdditionalCosts"),
             Header("Report.Column.Net"));
 
         foreach (var row in rows)
@@ -72,6 +73,7 @@ public static class ReportCsvExporter
                 row.Month.ToString(),
                 FormatMoney(row.GrossAmount),
                 FormatMoney(row.DiscountAmount),
+                FormatMoney(row.AdditionalCostAmount),
                 FormatMoney(row.NetAmount));
         }
     }

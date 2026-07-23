@@ -69,12 +69,13 @@ public static class ReportPdfExporter
             {
                 case ReportKind.DuesByMonth:
                     RenderTable(
-                        [3, 1, 1, 1, 1],
+                        [3, 1, 1, 1, 1, 1],
                         [
                             Header("Report.Column.Family"),
                             Header("Report.Column.Month"),
                             Header("Report.Column.Gross"),
                             Header("Report.Column.Discount"),
+                            Header("Report.Column.AdditionalCosts"),
                             Header("Report.Column.Net")
                         ],
                         _document.DuesByMonthRows.Select(row => new[]
@@ -83,9 +84,10 @@ public static class ReportPdfExporter
                             row.Month.ToString(),
                             FormatMoney(row.GrossAmount),
                             FormatMoney(row.DiscountAmount),
+                            FormatMoney(row.AdditionalCostAmount),
                             FormatMoney(row.NetAmount)
                         }),
-                        [false, false, true, true, true]);
+                        [false, false, true, true, true, true]);
                     break;
                 case ReportKind.PaymentsByMonth:
                     RenderTable(

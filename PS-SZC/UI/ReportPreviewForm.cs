@@ -83,6 +83,7 @@ internal sealed class ReportPreviewForm : Form
             ImGui.TableSetupColumn(LocalizedString.FromId("Report.Column.Month"));
             ImGui.TableSetupColumn(LocalizedString.FromId("Report.Column.Gross"));
             ImGui.TableSetupColumn(LocalizedString.FromId("Report.Column.Discount"));
+            ImGui.TableSetupColumn(LocalizedString.FromId("Report.Column.AdditionalCosts"));
             ImGui.TableSetupColumn(LocalizedString.FromId("Report.Column.Net"));
             ImGui.TableHeadersRow();
 
@@ -92,18 +93,21 @@ internal sealed class ReportPreviewForm : Form
                 1 => row.Month.ToString(),
                 2 => row.GrossAmount,
                 3 => row.DiscountAmount,
-                4 => row.NetAmount,
+                4 => row.AdditionalCostAmount,
+                5 => row.NetAmount,
                 _ => null
             });
 
             decimal totalGross = 0;
             decimal totalDiscount = 0;
+            decimal totalAdditionalCosts = 0;
             decimal totalNet = 0;
 
             foreach (var row in _duesRows)
             {
                 totalGross += row.GrossAmount;
                 totalDiscount += row.DiscountAmount;
+                totalAdditionalCosts += row.AdditionalCostAmount;
                 totalNet += row.NetAmount;
 
                 ImGui.TableNextRow();
@@ -116,13 +120,15 @@ internal sealed class ReportPreviewForm : Form
                 ImGui.TableNextColumn();
                 ImGui.Text(FormatMoney(row.DiscountAmount));
                 ImGui.TableNextColumn();
+                ImGui.Text(FormatMoney(row.AdditionalCostAmount));
+                ImGui.TableNextColumn();
                 ImGui.Text(FormatMoney(row.NetAmount));
             }
 
             ImGui.EndTable();
             ImGui.Spacing();
             ImGui.Separator();
-            ImGui.Text($"{LocalizedString.FromId("Report.Totals")}: {LocalizedString.FromId("Report.Column.Gross")} {FormatMoney(totalGross)} | {LocalizedString.FromId("Report.Column.Discount")} {FormatMoney(totalDiscount)} | {FormatMoney(totalNet)}");
+            ImGui.Text($"{LocalizedString.FromId("Report.Totals")}: {LocalizedString.FromId("Report.Column.Gross")} {FormatMoney(totalGross)} | {LocalizedString.FromId("Report.Column.Discount")} {FormatMoney(totalDiscount)} | {LocalizedString.FromId("Report.Column.AdditionalCosts")} {FormatMoney(totalAdditionalCosts)} | {FormatMoney(totalNet)}");
         });
 
     private void DrawPaymentsByMonthTable() => DrawTable(
@@ -228,7 +234,7 @@ internal sealed class ReportPreviewForm : Form
 
         var columnCount = id switch
         {
-            "DuesByMonthReport" => 5,
+            "DuesByMonthReport" => 6,
             "PaymentsByMonthReport" => 4,
             "AccountStatusReport" => 6,
             _ => 1
