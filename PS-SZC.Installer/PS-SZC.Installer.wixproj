@@ -12,8 +12,8 @@
     <InstallerPlatform>x64</InstallerPlatform>
     <Company>PostekSoftware</Company>
     <Product>PS-SZC</Product>
-    <AssemblyVersion>1.1</AssemblyVersion>
-    <FileVersion>1.1</FileVersion>
+    <AssemblyVersion>1.2</AssemblyVersion>
+    <FileVersion>1.2</FileVersion>
     <AppProjectFullPath>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..\PS-SZC\PS-SZC.csproj'))</AppProjectFullPath>
     <AppPublishDir>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..\PS-SZC\bin\$(Configuration)\net10.0\win-x64\publish\'))</AppPublishDir>
     <AppPublishDirForHarvest>$(AppPublishDir.Replace('\', '/'))</AppPublishDirForHarvest>
